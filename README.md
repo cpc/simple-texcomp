@@ -6,7 +6,7 @@ It is a direct translation of the [reference real-time GPU implementation by Wav
 ## Files & Notes
 
 * `simple_bc1.h`: Implementation of the BC1 algorithm (low quality, 6:1 compression)
-  * Setting `SELECT_DIAG` to `0` disables an optional refinement step and results in slightly lower quality but faster runtime
+  * Setting `SELECT_DIAG` to `0` disables an optional refinement step (when enabled, it sometimes improves quality but runs slightly slower)
   * Functions for encoding/decoding one 4x4 pixel block
 * `simple_ycocg_bc3.h`: Implementation of the YCoCg-BC3 algorithm (low quality, 3:1 compression)
   * Functions for encoding/decoding one 4x4 pixel block
