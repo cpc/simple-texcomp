@@ -61,10 +61,6 @@ static inline void select_diagonal(
         cov.y += t.y * t.z;
     }
 
-#ifndef NDEBUG
-    printf("## cov: %16.14f %16.14f\n", cov.x, cov.y);
-#endif
-
     if (cov.x < 0.0f) {
         double tmp = maxcol->x;
         maxcol->x = mincol->x;
