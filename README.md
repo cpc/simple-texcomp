@@ -1,6 +1,6 @@
 # Simple BCn
 
-Simple scalar CPU implementation of a BC1 and YCoCg-BC3 texture compression algorithms.
+Simple scalar CPU implementation of BC1 and YCoCg-BC3 texture compression algorithms.
 It is a direct translation of the [reference real-time GPU implementation by Waveren and Castaño](https://developer.download.nvidia.com/whitepapers/2007/Real-Time-YCoCg-DXT-Compression/Real-Time%20YCoCg-DXT%20Compression.pdf).
 
 ## Files & Notes
