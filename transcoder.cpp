@@ -17,9 +17,6 @@
 #include "simple_bc1.h"
 #include "simple_ycocg_bc3.h"
 
-/* Number of channels used per pixel (each is assumed to be 8 bits) */
-#define NCH_RGB  3
-
 namespace fs = std::filesystem;
 
 /* Possible encoding formats */
@@ -246,9 +243,9 @@ int main(int argc, char **argv)
         }
 
         // Dump encoded data to file as raw bits
-        std::string dump_name = out_dir
-            / (fs::path(inp_name).filename().replace_extension(".bin"));
-        dump_enc_data(enc_data, dump_name);
+        // std::string dump_name = out_dir
+        //     / (fs::path(inp_name).filename().replace_extension(".bin"));
+        // dump_enc_data(enc_data, dump_name);
 
         // Decode enc_data into out_pixels
         std::vector<unsigned char> out_pixels(inp_w*inp_h*NCH_RGB);
@@ -259,7 +256,7 @@ int main(int argc, char **argv)
 
         // Save decoded image into PNG file inside out_dir
         std::string out_name = out_dir / fs::path(inp_name).filename();
-        printf("-- Saving image to '%s'\n", out_name.data());
+        printf("-- Saving decoded image to '%s'\n", out_name.data());
         int ret = stbi_write_png(
             out_name.data(),
             inp_w,

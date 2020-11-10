@@ -134,21 +134,6 @@ struct Vec2f
     }
 };
 
-// inline double minf(double a, double b)
-// {
-//     return (a < b) ? a : b;
-// }
-
-// inline double maxf(double a, double b)
-// {
-//     return (a > b) ? a : b;
-// }
-
-// inline double absf(double a)
-// {
-//     return (a < 0) ? -a : a;
-// }
-
 inline double fclamp(double a, double amin, double amax)
 {
     const double min = a < amin ? amin : a;

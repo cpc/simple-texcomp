@@ -14,8 +14,8 @@ It is a direct translation of the [reference real-time GPU implementation by Wav
 * `transcoder.cpp`: An example CLI app for encoding, decoding and saving the results
   * Select encoding algorithm with the `ENC_FORMAT` constant
   * Accepts images to be encoded as CLI arguments, the last argument is an output directory
-    * Outputs decoded images into an output directory
-    * Outputs raw encoded bytes into an output directory (with a `.bin` extension)
+    * Outputs decoded images into the output directory
+    * (optional: uncomment if desired) Outputs raw encoded bytes into the output directory (with a `.bin` extension)
   * Example functions for encoding/decoding the whole image (must have width/height divisible by 4 due to the 4x4 block size)
 * `Makefile`: Requires C++17 standard due to the use of `std::filesystem` for convenience in `transcoder.cpp`, `simple_*.h` should be C++11-compatible
 * `stb/`: Image reading/writing (https://github.com/nothings/stb)
