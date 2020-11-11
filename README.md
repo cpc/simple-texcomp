@@ -30,12 +30,12 @@ The quality is slightly different between the CPU and GPU version due to the dif
 
 | dataset |  algorithm |  CPU(this) | GPU(OpenCL) |
 |:------- |:---------- | ----------:| -----------:|
-| kodim   | bc1_nosel  | 34.9096    | 35.6300     |
-| kodim   | bc1_sel    | 35.3600    | 35.6200     |
-| kodim   | ycocg_bc3  | 41.1189    | 41.1392     |
-| rgb8bit | bc1_nosel  | 37.6707    | 37.6845     |
-| rgb8bit | bc1_sel    | 37.9579    | 37.9723     |
-| rgb8bit | ycocg_bc3  | 42.3804    | 42.4597     |
+| kodim   | bc1_nosel  | 34.9159    | 35.6300     |
+| kodim   | bc1_sel    | 35.1000    | 35.6200     |
+| kodim   | ycocg_bc3  | 41.1476    | 41.1392     |
+| rgb8bit | bc1_nosel  | 37.7007    | 37.6845     |
+| rgb8bit | bc1_sel    | 37.9900    | 37.9723     |
+| rgb8bit | ycocg_bc3  | 42.4742    | 42.4597     |
 
 * bc1_nosel : using `simple_bc1.h` with `#define SELECT_DIAG 0`
 * bc1_sel   : using `simple_bc1.h` with `#define SELECT_DIAG 1`
