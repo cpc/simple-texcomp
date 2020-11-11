@@ -34,16 +34,6 @@ static inline uint32_t f32_to_rgb565(Vec3f *color)
     return out;
 }
 
-/* Convert a color from RGB565 format into floating point */
-static inline Vec3f rgb565_to_f32(uint16_t color)
-{
-    return Vec3f {
-        (double)( (color >> 11) & 0x1f ) / 0x1f,
-        (double)( (color >> 5) & 0x3f ) / 0x3f,
-        (double)( color & 0x1f ) / 0x1f,
-    };
-}
-
 #if SELECT_DIAG == 1
 /* Optional selection of either current or oposite diagonal - small performance
  * cost and minimal quality improvement. */

@@ -209,4 +209,22 @@ inline void find_minmaxcolor_bbox(
     }
 }
 
+/* Convert a color from RGB565 format into floating point */
+inline Vec3f rgb565_to_f32(uint16_t color)
+{
+    uint8_t r = (color >> 11) & 0x1f;
+    uint8_t g = (color >> 5) & 0x3f;
+    uint8_t b = color & 0x1f;
+
+    r = (r << 3) | (r >> 2);
+    g = (g << 2) | (g >> 4);
+    b = (b << 3) | (b >> 2);
+
+    return Vec3f {
+        (double)(r) / 255.0f,
+        (double)(g) / 255.0f,
+        (double)(b) / 255.0f,
+    };
+}
+
 #endif // SIMPLE_BCN_COMMON_H
