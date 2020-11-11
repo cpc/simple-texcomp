@@ -30,8 +30,8 @@ The quality is slightly different between the CPU and GPU version due to the dif
 
 | dataset |  algorithm |  CPU(this) | GPU(OpenCL) |
 |:------- |:---------- | ----------:| -----------:|
-| kodim   | bc1_nosel  | 34.9159    | 35.6300     |
-| kodim   | bc1_sel    | 35.1000    | 35.6200     |
+| kodim   | bc1_nosel  | 34.9159    | 34.9122     |
+| kodim   | bc1_sel    | 35.1000    | 35.6300     |
 | kodim   | ycocg_bc3  | 41.1476    | 41.1392     |
 | rgb8bit | bc1_nosel  | 37.7007    | 37.6845     |
 | rgb8bit | bc1_sel    | 37.9900    | 37.9723     |
