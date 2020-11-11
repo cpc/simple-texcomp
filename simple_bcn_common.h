@@ -13,8 +13,8 @@
 #define NCH_RGB  3
 
 /* Endpoint interpolation constants */
-#define EP_LERP1  1.0f / 3.0f
-#define EP_LERP2  2.0f / 3.0f
+#define EP_LERP1  1.0 / 3.0
+#define EP_LERP2  2.0 / 3.0
 
 /* Helper structs and math */
 struct Vec3f
@@ -199,8 +199,8 @@ inline void find_minmaxcolor_bbox(
     Vec3f *mincol,
     Vec3f *maxcol
 ){
-    *mincol = { 1.0f, 1.0f, 1.0f };
-    *maxcol = { 0.0f, 0.0f, 0.0f };
+    *mincol = { 1.0, 1.0, 1.0 };
+    *maxcol = { 0.0, 0.0, 0.0 };
 
     for (int i = 0; i < 16; ++i)
     {
@@ -221,9 +221,9 @@ inline Vec3f rgb565_to_f32(uint16_t color)
     b = (b << 3) | (b >> 2);
 
     return Vec3f {
-        (double)(r) / 255.0f,
-        (double)(g) / 255.0f,
-        (double)(b) / 255.0f,
+        (double)(r) / 255.0,
+        (double)(g) / 255.0,
+        (double)(b) / 255.0,
     };
 }
 

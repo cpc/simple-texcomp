@@ -7,11 +7,11 @@
 
 /* Rounding the bounding box inset outwards
  * = (8.0/255.0)/16.0 for CoCg and (16.0/255.0)/32.0 for Y */
-#define INSET_MARGIN_Y  (16.0f / 255.0f) / 32.0f
-#define INSET_MARGIN_COCG  (8.0f / 255.0f) / 16.0f
+#define INSET_MARGIN_Y  (16.0 / 255.0) / 32.0
+#define INSET_MARGIN_COCG  (8.0 / 255.0) / 16.0
 
 /* Offset to center color value at grey level (= 128.0/255.0) */
-#define OFFSET  128.0f / 255.0f
+#define OFFSET  128.0 / 255.0
 
 /* Helper type for easier access of 16b and 32b words inside a 64b block
  *
@@ -38,16 +38,16 @@ static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
 /* Convert a f32 2-channel color into RG channels and scale into B channel */
 static inline uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
 {
-    uint32_t r = (uint32_t)round(color->x * 31.0f);
-    uint32_t g = (uint32_t)round(color->y * 63.0f);
+    uint32_t r = (uint32_t)round(color->x * 31.0);
+    uint32_t g = (uint32_t)round(color->y * 63.0);
 
     uint32_t out = (r << 11) | (g << 5) | (scale - 1);
 
     r = (r << 3) | (r >> 2);
     g = (g << 2) | (g >> 4);
 
-    color->x = (double)(r) * (1.0f / 255.0f);
-    color->y = (double)(g) * (1.0f / 255.0f);
+    color->x = (double)(r) * (1.0 / 255.0);
+    color->y = (double)(g) * (1.0 / 255.0);
 
     return out;
 }
@@ -60,7 +60,7 @@ static inline void select_cocg_diagonal(
 ){
     Vec2f center = (*min_cocg + *max_cocg) * 0.5f;
 
-    double cov = 0.0f;
+    double cov = 0.0;
     for (int i = 0; i < 16; ++i) {
         Vec2f t = {
             block[i].y - center.x,
@@ -105,9 +105,9 @@ void inset_bbox_cocg(
     Vec2f *min_cocg,
     Vec2f *max_cocg
 ){
-    Vec2f inset = (*max_cocg - *min_cocg) * (1.0f / 16.0f) - INSET_MARGIN_COCG;
-    *min_cocg = clamp2f(*min_cocg + inset, 0.0f, 1.0f);
-    *max_cocg = clamp2f(*max_cocg - inset, 0.0f, 1.0f);
+    Vec2f inset = (*max_cocg - *min_cocg) * (1.0 / 16.0) - INSET_MARGIN_COCG;
+    *min_cocg = clamp2f(*min_cocg + inset, 0.0, 1.0);
+    *max_cocg = clamp2f(*max_cocg - inset, 0.0, 1.0);
 }
 
 /* Write endpoints to the BC1 block */
@@ -186,9 +186,9 @@ void inset_bbox_y(
     double *min_y,
     double *max_y
 ){
-    double inset = (*max_y - *min_y) / 32.0f - INSET_MARGIN_Y;
-    *min_y = fclamp(*min_y + inset, 0.0f, 1.0f);
-    *max_y = fclamp(*max_y - inset, 0.0f, 1.0f);
+    double inset = (*max_y - *min_y) / 32.0 - INSET_MARGIN_Y;
+    *min_y = fclamp(*min_y + inset, 0.0, 1.0);
+    *max_y = fclamp(*max_y - inset, 0.0, 1.0);
 }
 
 /* Write Y endpoints into the BC4 block, each 8 bits */
@@ -199,8 +199,8 @@ void emit_endpoints_y(
 ){
     inset_bbox_y(min_y, max_y);
 
-    out_block->b8[0] = (uint8_t)(round(*max_y * 255.0f));
-    out_block->b8[1] = (uint8_t)(round(*min_y * 255.0f));
+    out_block->b8[0] = (uint8_t)(round(*max_y * 255.0));
+    out_block->b8[1] = (uint8_t)(round(*min_y * 255.0));
 }
 
 /* Write 3-bit Y indices into the rest of the BC4 block */
@@ -210,15 +210,15 @@ void emit_indices_y(
     const double &max_y,
     bc_block_t *out_block
 ){
-    double mid = (max_y - min_y) / (2.0f * 7);
+    double mid = (max_y - min_y) / (2.0 * 7);
 
     double ab1 = min_y + mid;
-    double ab2 = (6.0f * max_y + 1.0f * min_y) * (1.0f / 7) + mid;
-    double ab3 = (5.0f * max_y + 2.0f * min_y) * (1.0f / 7) + mid;
-    double ab4 = (4.0f * max_y + 3.0f * min_y) * (1.0f / 7) + mid;
-    double ab5 = (3.0f * max_y + 4.0f * min_y) * (1.0f / 7) + mid;
-    double ab6 = (2.0f * max_y + 5.0f * min_y) * (1.0f / 7) + mid;
-    double ab7 = (1.0f * max_y + 6.0f * min_y) * (1.0f / 7) + mid;
+    double ab2 = (6.0 * max_y + 1.0 * min_y) * (1.0 / 7) + mid;
+    double ab3 = (5.0 * max_y + 2.0 * min_y) * (1.0 / 7) + mid;
+    double ab4 = (4.0 * max_y + 3.0 * min_y) * (1.0 / 7) + mid;
+    double ab5 = (3.0 * max_y + 4.0 * min_y) * (1.0 / 7) + mid;
+    double ab6 = (2.0 * max_y + 5.0 * min_y) * (1.0 / 7) + mid;
+    double ab7 = (1.0 * max_y + 6.0 * min_y) * (1.0 / 7) + mid;
 
     bc_block_t indices;
     indices.b64 = 0;
@@ -254,9 +254,9 @@ void encode_block_ycocg_bc3(
     {
         block32f_ycocg[i] = rgb_to_ycocg(
             Vec3f {
-                (double)block_pixels[NCH_RGB*i] / 255.0f,
-                (double)block_pixels[NCH_RGB*i+1] / 255.0f,
-                (double)block_pixels[NCH_RGB*i+2] / 255.0f,
+                (double)block_pixels[NCH_RGB*i] / 255.0,
+                (double)block_pixels[NCH_RGB*i+1] / 255.0,
+                (double)block_pixels[NCH_RGB*i+2] / 255.0,
             }
         );
     }
@@ -300,17 +300,17 @@ void decode_block_ycocg_bc3(
         .b32 = { enc_block[0], enc_block[1] }
     };
 
-    double max_y = (double)block_y.b8[0] / 255.0f;
-    double min_y = (double)block_y.b8[1] / 255.0f;
+    double max_y = (double)block_y.b8[0] / 255.0;
+    double min_y = (double)block_y.b8[1] / 255.0;
     double palette_y[8];
     palette_y[0] = max_y;
     palette_y[1] = min_y;
-    palette_y[2] = (6.0f * max_y + 1.0f * min_y) * (1.0f / 7);
-    palette_y[3] = (5.0f * max_y + 2.0f * min_y) * (1.0f / 7);
-    palette_y[4] = (4.0f * max_y + 3.0f * min_y) * (1.0f / 7);
-    palette_y[5] = (3.0f * max_y + 4.0f * min_y) * (1.0f / 7);
-    palette_y[6] = (2.0f * max_y + 5.0f * min_y) * (1.0f / 7);
-    palette_y[7] = (1.0f * max_y + 6.0f * min_y) * (1.0f / 7);
+    palette_y[2] = (6.0 * max_y + 1.0 * min_y) * (1.0 / 7.0);
+    palette_y[3] = (5.0 * max_y + 2.0 * min_y) * (1.0 / 7.0);
+    palette_y[4] = (4.0 * max_y + 3.0 * min_y) * (1.0 / 7.0);
+    palette_y[5] = (3.0 * max_y + 4.0 * min_y) * (1.0 / 7.0);
+    palette_y[6] = (2.0 * max_y + 5.0 * min_y) * (1.0 / 7.0);
+    palette_y[7] = (1.0 * max_y + 6.0 * min_y) * (1.0 / 7.0);
 
     // Read CoCg palette
     bc_block_t block_cocg = {
@@ -331,7 +331,7 @@ void decode_block_ycocg_bc3(
         int id_cocg = ( block_cocg.b32[1] >> (2*i) ) & 0x3;
         Vec3f cocgscale = palette_cocgscale[id_cocg];
 
-        double inv_scale = 1.0f / ((255.0f / 8.0f) * cocgscale.z + 1.0f);
+        double inv_scale = 1.0 / ((255.0 / 8.0) * cocgscale.z + 1.0);
         double co = (cocgscale.x - OFFSET) * inv_scale;
         double cg = (cocgscale.y - OFFSET) * inv_scale;
 
@@ -342,13 +342,13 @@ void decode_block_ycocg_bc3(
 		// double g = y + cg;
 		// double b = y - co - cg;
 
-		double r = fclamp(y + co - cg, 0.0f, 1.0f);
-		double g = fclamp(y + cg, 0.0f, 1.0f);
-		double b = fclamp(y - co - cg, 0.0f, 1.0f);
+		double r = fclamp(y + co - cg, 0.0, 1.0);
+		double g = fclamp(y + cg, 0.0, 1.0);
+		double b = fclamp(y - co - cg, 0.0, 1.0);
 
-        out_pixels[NCH_RGB*i] = (uint8_t)(r * 255.0f);
-        out_pixels[NCH_RGB*i+1] = (uint8_t)(g * 255.0f);
-        out_pixels[NCH_RGB*i+2] = (uint8_t)(b * 255.0f);
+        out_pixels[NCH_RGB*i] = (uint8_t)(r * 255.0);
+        out_pixels[NCH_RGB*i+1] = (uint8_t)(g * 255.0);
+        out_pixels[NCH_RGB*i+2] = (uint8_t)(b * 255.0);
     }
 }
 

@@ -12,14 +12,14 @@
 #define SELECT_DIAG  1
 
 /* Rounding the bounding box inset outwards (= (8.0/255.0)/16.0) */
-#define INSET_MARGIN  (8.0f / 255.0f) / 16.0f
+#define INSET_MARGIN  (8.0 / 255.0) / 16.0
 
 /* Convert a floating-point color into the RGB565 format */
 static inline uint32_t f32_to_rgb565(Vec3f *color)
 {
-    uint32_t r = (uint32_t)round(color->x * 31.0f);
-    uint32_t g = (uint32_t)round(color->y * 63.0f);
-    uint32_t b = (uint32_t)round(color->z * 31.0f);
+    uint32_t r = (uint32_t)round(color->x * 31.0);
+    uint32_t g = (uint32_t)round(color->y * 63.0);
+    uint32_t b = (uint32_t)round(color->z * 31.0);
 
     uint32_t out = (r << 11) | (g << 5) | b;
 
@@ -27,9 +27,9 @@ static inline uint32_t f32_to_rgb565(Vec3f *color)
     g = (g << 2) | (g >> 4);
     b = (b << 3) | (b >> 2);
 
-    color->x = (double)(r) * (1.0f / 255.0f);
-    color->y = (double)(g) * (1.0f / 255.0f);
-    color->z = (double)(b) * (1.0f / 255.0f);
+    color->x = (double)(r) * (1.0 / 255.0);
+    color->y = (double)(g) * (1.0 / 255.0);
+    color->z = (double)(b) * (1.0 / 255.0);
 
     return out;
 }
@@ -44,20 +44,20 @@ static inline void select_diagonal(
 ){
     Vec3f center = (*mincol + *maxcol) * 0.5f;
 
-    Vec2f cov = { 0.0f, 0.0f };
+    Vec2f cov = { 0.0, 0.0 };
     for (int i = 0; i < 16; ++i) {
         Vec3f t = block[i] - center;
         cov.x += t.x * t.z;
         cov.y += t.y * t.z;
     }
 
-    if (cov.x < 0.0f) {
+    if (cov.x < 0.0) {
         double tmp = maxcol->x;
         maxcol->x = mincol->x;
         mincol->x = tmp;
     }
 
-    if (cov.y < 0.0f) {
+    if (cov.y < 0.0) {
         double tmp = maxcol->y;
         maxcol->y = mincol->y;
         mincol->y = tmp;
@@ -69,9 +69,9 @@ static inline void select_diagonal(
  * eliminate influence of outliers */
 static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 {
-    Vec3f inset = (*maxcol - *mincol) * (1.0f / 16.0f) - INSET_MARGIN;
-    *mincol = clamp3f(*mincol + inset, 0.0f, 1.0f);
-    *maxcol = clamp3f(*maxcol - inset, 0.0f, 1.0f);
+    Vec3f inset = (*maxcol - *mincol) * (1.0 / 16.0) - INSET_MARGIN;
+    *mincol = clamp3f(*mincol + inset, 0.0, 1.0);
+    *maxcol = clamp3f(*maxcol - inset, 0.0, 1.0);
 }
 
 /* Write two 16b endpoints to a 32b integer (MSB - mincol, LSB - maxcol) */
@@ -139,9 +139,9 @@ void encode_block_bc1(
     Vec3f block32f[16];
     for (int i = 0; i < 16; ++i)
     {
-        block32f[i].x = (double)block_pixels[NCH_RGB*i] / 255.0f;
-        block32f[i].y = (double)block_pixels[NCH_RGB*i+1] / 255.0f;
-        block32f[i].z = (double)block_pixels[NCH_RGB*i+2] / 255.0f;
+        block32f[i].x = (double)block_pixels[NCH_RGB*i] / 255.0;
+        block32f[i].y = (double)block_pixels[NCH_RGB*i+1] / 255.0;
+        block32f[i].z = (double)block_pixels[NCH_RGB*i+2] / 255.0;
     }
 
     // Determine line through color space
@@ -174,9 +174,9 @@ void decode_block_bc1(
     {
         int id = ( enc_block[1] >> (2*i) ) & 0x3;
         Vec3f res = palette[id];
-        out_pixels[NCH_RGB*i] = (uint8_t)(res.x * 255.0f);
-        out_pixels[NCH_RGB*i+1] = (uint8_t)(res.y * 255.0f);
-        out_pixels[NCH_RGB*i+2] = (uint8_t)(res.z * 255.0f);
+        out_pixels[NCH_RGB*i] = (uint8_t)(res.x * 255.0);
+        out_pixels[NCH_RGB*i+1] = (uint8_t)(res.y * 255.0);
+        out_pixels[NCH_RGB*i+2] = (uint8_t)(res.z * 255.0);
     }
 }
 
