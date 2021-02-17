@@ -292,6 +292,8 @@ int main(int argc, char **argv)
         stbi_image_free(inp_pixels);
     }
 
+    printf("\n");
+    printf("Encoded images                : %9d\n", num_enc_images);
     printf("Average encoding time (sec)   : %9.5f\n", total_enc_duration / num_enc_images);
     printf("Average encoding rate (Mpx/s) : %9.5f\n", total_num_enc_pixels / total_enc_duration / 1e6);
 
