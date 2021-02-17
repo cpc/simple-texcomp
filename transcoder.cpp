@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include <filesystem>
 #include <fstream>
@@ -186,6 +187,14 @@ void dump_enc_data(
     wf.close();
 }
 
+/* Read the current time and return seconds (taken from astcenc) */
+double get_time()
+{
+    timeval tv;
+    gettimeofday(&tv, 0);
+    return (double)tv.tv_sec + (double)tv.tv_usec * 1.0e-6;
+}
+
 int main(int argc, char **argv)
 {
     // Check command line arguments
@@ -204,6 +213,10 @@ int main(int argc, char **argv)
 
     // Error code
     int err = 0;
+
+    double total_enc_duration = 0.0;
+    uint64_t total_num_enc_pixels = 0;
+    int num_enc_images = 0;
 
     // Loop through images one by one
     for (int i = 1; i < argc-1; ++i)
@@ -235,12 +248,18 @@ int main(int argc, char **argv)
             continue;
         }
 
+        double enc_start_time = get_time();
+
         // Encode it into enc_data
         std::vector<uint32_t> enc_data;
         if (encode_image(inp_pixels, inp_w, inp_h, enc_data))
         {
             continue;
         }
+
+        total_enc_duration += ( get_time() - enc_start_time );
+        total_num_enc_pixels += ( inp_w * inp_h );
+        num_enc_images += 1;
 
         // Dump encoded data to file as raw bits
         // std::string dump_name = out_dir
@@ -272,6 +291,9 @@ int main(int argc, char **argv)
 
         stbi_image_free(inp_pixels);
     }
+
+    printf("Average encoding time (sec)   : %.6f\n", total_enc_duration / num_enc_images);
+    printf("Average encoding rate (Mpx/s) : %.3f\n", total_num_enc_pixels / total_enc_duration / 1e6);
 
     return err;
 }

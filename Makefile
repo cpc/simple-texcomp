@@ -1,5 +1,5 @@
-CC=g++
-CCFLAGS=-std=c++17 -Wall -Wextra -isystem stb -I . -lm -lstdc++fs
+CC=clang++
+CCFLAGS=-std=c++17 -Wall -Wextra -isystem stb -I . # flags for g++: -lm -lstdc++fs
 
 MAIN=transcoder
 DEPS=*.h stb/*.h
@@ -22,6 +22,6 @@ clean:
 	rm -f $(MAIN).o $(MAIN)
 
 bear: clean
-	bear -- make
+	bear make
 
 force: clean $(MAIN)
