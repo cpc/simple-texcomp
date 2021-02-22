@@ -42,6 +42,79 @@ void err_exit(const std::string& err_msg, bool print_usage=false)
     exit(1);
 }
 
+/* Pad image so that width and height are divisible by 4
+ *
+ * Border pixels are repeated
+ */
+void pad_image(
+    const uint8_t *inp_pixels,
+    int img_w,
+    int img_h,
+    std::vector<uint8_t>& padded_img,
+    int& pad_w,
+    int& pad_h
+){
+    // Number of blocks in horizontal and vertical dimension
+    const int nblocks_x = ( img_w + (4 - 1) ) / 4;
+    const int nblocks_y = ( img_h + (4 - 1) ) / 4;
+
+    // Image size after padding
+    pad_w = nblocks_x * 4;
+    pad_h = nblocks_y * 4;
+
+	padded_img.resize(pad_w * pad_h * NCH_RGB);
+    for (int i = 0; i < pad_w*pad_h*NCH_RGB; ++i)
+    {
+        padded_img[i] = 0;
+    }
+
+    for (int y = 0; y < pad_h; ++y)
+    {
+        // Repeat the last row that goes over the image height
+        int y_in = std::min(y, img_h-1);
+
+        // Copy the image row
+        memcpy(
+            padded_img.data() + (y * pad_w * NCH_RGB), // dest
+            inp_pixels + (y_in * img_w * NCH_RGB),     // src
+            img_w * NCH_RGB                            // num_bytes
+        );
+
+        // Repeat the last pixel of the row
+        for (int x = img_w; x < pad_w; ++x)
+        {
+            int i1 = NCH_RGB * (y * pad_w + x);
+            int i2 = NCH_RGB * (y * pad_w + img_w - 1);
+            for (int n = 0; n < NCH_RGB; ++n)
+            {
+                padded_img[i1+n] = padded_img[i2+n];
+            }
+        }
+    }
+}
+
+/* Trim image of size src_w x src_h to the size of tgt_w x tgt_h
+ *
+ * Assumes src_w/h >= tgt_w/h, otherwise bad stuff will happen
+ */
+void trim_image(
+    const std::vector<uint8_t>& src_img,
+    int src_w,
+    std::vector<uint8_t>& tgt_img,
+    int tgt_w,
+    int tgt_h
+){
+    // Just copy rows of tgt_w pixels
+    for (int y = 0; y < tgt_h; ++y)
+    {
+        memcpy(
+            tgt_img.data() + (y * tgt_w * NCH_RGB),  // dest
+            src_img.data() + (y * src_w * NCH_RGB),  // src
+            tgt_w * NCH_RGB                          // num_bytes
+        );
+    }
+}
+
 /* Encode the whole image according to ENC_FORMAT
  *
  * Returns zero on success, non-zero on failure.
@@ -215,12 +288,15 @@ int main(int argc, char **argv)
     int err = 0;
 
     double total_enc_duration = 0.0;
+    double total_duration = 0.0;
     uint64_t total_num_enc_pixels = 0;
     int num_enc_images = 0;
 
     // Loop through images one by one
     for (int i = 1; i < argc-1; ++i)
     {
+        double start_time = get_time();
+
         std::string inp_name = argv[i];
         printf("Image %d/%d: %s\n", i, argc-2, inp_name.data());
 
@@ -240,25 +316,29 @@ int main(int argc, char **argv)
             continue;
         }
 
-        // Image width and height must be multiples of 4 (would have to pad...)
-        if ( (inp_w % 4 != 0) || (inp_h % 4 != 0) )
+        // Pad image to fit the image dimensions being divisible by block size
+        std::vector<uint8_t> padded_img;
+        int pad_w = -1;
+        int pad_h = -1;
+        pad_image(inp_pixels, inp_w, inp_h, padded_img, pad_w, pad_h);
+
+        if ( (inp_w != pad_w) || (inp_h != pad_h) )
         {
-            printf("-- Image size must be divisible by 4, skipping\n");
-            err = 1;
-            continue;
+            printf("-- Image size %dx%d, after padding %dx%d\n", inp_w, inp_h, pad_w, pad_h);
         }
 
         double enc_start_time = get_time();
 
         // Encode it into enc_data
         std::vector<uint32_t> enc_data;
-        if (encode_image(inp_pixels, inp_w, inp_h, enc_data))
+        if (encode_image(padded_img.data(), pad_w, pad_h, enc_data))
         {
+            printf("-- Error encoding image\n");
             continue;
         }
 
         total_enc_duration += ( get_time() - enc_start_time );
-        total_num_enc_pixels += ( inp_w * inp_h );
+        total_num_enc_pixels += ( pad_w * pad_h );
         num_enc_images += 1;
 
         // Dump encoded data to file as raw bits
@@ -266,12 +346,17 @@ int main(int argc, char **argv)
         //     / (fs::path(inp_name).filename().replace_extension(".bin"));
         // dump_enc_data(enc_data, dump_name);
 
-        // Decode enc_data into out_pixels
-        std::vector<unsigned char> out_pixels(inp_w*inp_h*NCH_RGB);
-        if (decode_image(enc_data, inp_w, inp_h, out_pixels))
+        // Decode encoded data
+        std::vector<uint8_t> dec_image(pad_w*pad_h*NCH_RGB);
+        if (decode_image(enc_data, pad_w, pad_h, dec_image))
         {
+            printf("-- Error decoding image\n");
             continue;
         }
+
+        // Trim the decoded image back into the original size before padding
+        std::vector<uint8_t> out_pixels(inp_w*inp_h*NCH_RGB);
+        trim_image(dec_image, pad_w, out_pixels, inp_w, inp_h);
 
         // Save decoded image into PNG file inside out_dir
         std::string out_name = out_dir / fs::path(inp_name).filename();
@@ -290,12 +375,15 @@ int main(int argc, char **argv)
         }
 
         stbi_image_free(inp_pixels);
+
+        total_duration += ( get_time() - start_time );
     }
 
     printf("\n");
     printf("Encoded images                : %9d\n", num_enc_images);
     printf("Average encoding time (sec)   : %9.5f\n", total_enc_duration / num_enc_images);
     printf("Average encoding rate (Mpx/s) : %9.5f\n", total_num_enc_pixels / total_enc_duration / 1e6);
+    printf("Average total time (sec)      : %9.5f\n", total_duration / num_enc_images);
 
     return err;
 }
