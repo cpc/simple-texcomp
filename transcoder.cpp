@@ -27,7 +27,7 @@ typedef enum enc_format_t {
 } enc_format_t;
 
 /* Define encoding format here */
-const enc_format_t ENC_FORMAT = YCOCG_BC3;
+const enc_format_t ENC_FORMAT = BC1;
 
 /* Print usage */
 void err_exit(const std::string& err_msg, bool print_usage=false)
