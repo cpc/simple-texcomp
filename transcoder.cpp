@@ -359,7 +359,7 @@ int main(int argc, char **argv)
         trim_image(dec_image, pad_w, out_pixels, inp_w, inp_h);
 
         // Save decoded image into PNG file inside out_dir
-        std::string out_name = out_dir / fs::path(inp_name).filename();
+        std::string out_name = out_dir / fs::path(inp_name).filename().replace_extension(".png");
         printf("-- Saving decoded image to '%s'\n", out_name.data());
         int ret = stbi_write_png(
             out_name.data(),
