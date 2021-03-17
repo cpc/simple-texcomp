@@ -246,7 +246,7 @@ void emit_indices_y(
 /* Encode a block of 4x4 pixels into the YCoCg-BC3 format */
 void encode_block_ycocg_bc3(
     const uint8_t block_pixels[NCH_RGB*16],
-    uint32_t out[2]
+    uint32_t out[4]
 ){
     // Convert the block into floating point and YCoCg color space
     Vec3f block32f_ycocg[16];
