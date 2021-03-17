@@ -17,6 +17,7 @@
 #include "simple_bcn_common.h"
 #include "simple_bc1.h"
 #include "simple_ycocg_bc3.h"
+#include "simple_astc.h"
 
 namespace fs = std::filesystem;
 
@@ -24,10 +25,11 @@ namespace fs = std::filesystem;
 typedef enum enc_format_t {
     BC1,
     YCOCG_BC3,
+    ASTC,
 } enc_format_t;
 
 /* Define encoding format here */
-const enc_format_t ENC_FORMAT = BC1;
+const enc_format_t ENC_FORMAT = ASTC;
 
 /* Print usage */
 void err_exit(const std::string& err_msg, bool print_usage=false)
@@ -54,13 +56,17 @@ void pad_image(
     int& pad_w,
     int& pad_h
 ){
+    // Input block size
+    const int block_w = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_X : 4;
+    const int block_h = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_Y : 4;
+
     // Number of blocks in horizontal and vertical dimension
-    const int nblocks_x = ( img_w + (4 - 1) ) / 4;
-    const int nblocks_y = ( img_h + (4 - 1) ) / 4;
+    const int nblocks_x = ( img_w + (block_w - 1) ) / block_w;
+    const int nblocks_y = ( img_h + (block_h - 1) ) / block_h;
 
     // Image size after padding
-    pad_w = nblocks_x * 4;
-    pad_h = nblocks_y * 4;
+    pad_w = nblocks_x * block_w;
+    pad_h = nblocks_y * block_h;
 
 	padded_img.resize(pad_w * pad_h * NCH_RGB);
     for (int i = 0; i < pad_w*pad_h*NCH_RGB; ++i)
@@ -125,11 +131,15 @@ int encode_image(
     int img_h,
     std::vector<uint32_t>& enc_data
 ){
-    // Number of blocks in horizontal and vertical dimension
-    const int nblocks_x = img_w / 4;
-    const int nblocks_y = img_h / 4;
+    // Input block size
+    const int block_w = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_X : 4;
+    const int block_h = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_Y : 4;
 
-    void (*encode_block)( const uint8_t[NCH_RGB*16], uint32_t[2] );
+    // Number of blocks in horizontal and vertical dimension
+    const int nblocks_x = img_w / block_w;
+    const int nblocks_y = img_h / block_h;
+
+    void (*encode_block)( const uint8_t*, uint32_t* );
 
     // Based on encoding format:
     //   1. Set encoded block size as a number of 32-bit integers
@@ -143,6 +153,10 @@ int encode_image(
     case YCOCG_BC3:
         block_nints = 4; // 128 bits per 4x4 block
         encode_block = encode_block_ycocg_bc3;
+        break;
+    case ASTC:
+        block_nints = 4; // 128 bits per block
+        encode_block = encode_block_astc;
         break;
     default:
         fprintf(stderr, "ERROR: Unsupported encoding format\n");
@@ -159,15 +173,15 @@ int encode_image(
         for (int block_x = 0; block_x < nblocks_x; ++block_x)
         {
             // Read 4x4 block of pixels into an array
-            uint8_t block_pixels[NCH_RGB*16];
-            const int x = block_x * 4;
-            const int y = block_y * 4;
-            for (int i = 0; i < 4; ++i)
+            uint8_t block_pixels[NCH_RGB*block_w*block_h];
+            const int x = block_x * block_w;
+            const int y = block_y * block_h;
+            for (int i = 0; i < block_h; ++i)
             {
                 memcpy(
-                    block_pixels + (NCH_RGB * i * 4),
+                    block_pixels + (NCH_RGB * i * block_w),
                     inp_pixels + (NCH_RGB * (img_w * (y+i) + x)),
-                    NCH_RGB * 4
+                    NCH_RGB * block_w
                 );
             }
 
@@ -209,6 +223,8 @@ int decode_image(
         block_nints = 4; // 128 bits per 4x4 block
         decode_block = decode_block_ycocg_bc3;
         break;
+    case ASTC:
+        return 0;
     default:
         fprintf(stderr, "ERROR: Unsupported encoding format\n");
         return 1;
@@ -284,6 +300,13 @@ int main(int argc, char **argv)
         err_exit("Can't open output directory", true);
     }
 
+    if (ENC_FORMAT == ASTC)
+    {
+        printf("WARNING: ASTC format decoding is not supported. Instead,"
+               " encoded images are saved as .astc files in the output"
+               " directory.\n");
+    }
+
     // Error code
     int err = 0;
 
@@ -334,6 +357,7 @@ int main(int argc, char **argv)
         if (encode_image(padded_img.data(), pad_w, pad_h, enc_data))
         {
             printf("-- Error encoding image\n");
+            stbi_image_free(inp_pixels);
             continue;
         }
 
@@ -351,27 +375,51 @@ int main(int argc, char **argv)
         if (decode_image(enc_data, pad_w, pad_h, dec_image))
         {
             printf("-- Error decoding image\n");
+            stbi_image_free(inp_pixels);
             continue;
         }
 
-        // Trim the decoded image back into the original size before padding
-        std::vector<uint8_t> out_pixels(inp_w*inp_h*NCH_RGB);
-        trim_image(dec_image, pad_w, out_pixels, inp_w, inp_h);
-
-        // Save decoded image into PNG file inside out_dir
-        std::string out_name = out_dir / fs::path(inp_name).filename().replace_extension(".png");
-        printf("-- Saving decoded image to '%s'\n", out_name.data());
-        int ret = stbi_write_png(
-            out_name.data(),
-            inp_w,
-            inp_h,
-            NCH_RGB,
-            out_pixels.data(),
-            inp_w*NCH_RGB
-        );
-        if (ret == 0)
+        // Save result file into out_dir
+        if (ENC_FORMAT == ASTC)
         {
-            err_exit("Can't save output image");
+            std::string out_name = out_dir
+                / fs::path(inp_name).filename().replace_extension(".astc");
+            printf("-- Saving encoded image to '%s'\n", out_name.data());
+            int ret = store_astc_image(
+                (uint8_t*)enc_data.data(),
+                4*enc_data.size(),
+                inp_w,
+                inp_h,
+                out_name.c_str()
+            );
+            if (ret != 0)
+            {
+                printf("-- Error saving .astc file\n");
+                stbi_image_free(inp_pixels);
+                continue;
+            }
+        }
+        else
+        {
+            // Trim the decoded image back into the original size before padding
+            std::vector<uint8_t> out_pixels(inp_w*inp_h*NCH_RGB);
+            trim_image(dec_image, pad_w, out_pixels, inp_w, inp_h);
+
+            std::string out_name = out_dir
+                / fs::path(inp_name).filename().replace_extension(".png");
+            printf("-- Saving decoded image to '%s'\n", out_name.data());
+            int ret = stbi_write_png(
+                out_name.data(),
+                inp_w,
+                inp_h,
+                NCH_RGB,
+                out_pixels.data(),
+                inp_w*NCH_RGB
+            );
+            if (ret == 0)
+            {
+                err_exit("Can't save output image");
+            }
         }
 
         stbi_image_free(inp_pixels);
