@@ -18,6 +18,9 @@ debug: clean $(MAIN)
 release: CCFLAGS += -O3 -DNDEBUG
 release: clean $(MAIN)
 
+quantizer: quantizer.cpp
+	$(CC) $(CCFLAGS) -O3 quantizer.cpp -o quantizer
+
 clean:
 	rm -f $(MAIN).o $(MAIN)
 
