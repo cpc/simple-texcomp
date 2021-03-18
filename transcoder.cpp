@@ -31,7 +31,7 @@ typedef enum enc_format_t {
 /* Define encoding format here */
 const enc_format_t ENC_FORMAT = ASTC;
 
-/* Print usage */
+/* Exit with error, optionally printing usage */
 void err_exit(const std::string& err_msg, bool print_usage=false)
 {
     fprintf(stderr, "ERROR: %s\n", err_msg.data());
