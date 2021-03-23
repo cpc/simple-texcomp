@@ -21,10 +21,15 @@ release: clean $(MAIN)
 quantizer: quantizer.cpp
 	$(CC) $(CCFLAGS) -O3 quantizer.cpp -o quantizer
 
+downsampler: downsampler.cpp
+	$(CC) $(CCFLAGS) -O3 downsampler.cpp -o downsampler
+
 clean:
-	rm -f $(MAIN).o $(MAIN)
+	rm -f $(MAIN).o $(MAIN) quantizer downsampler
 
 bear: clean
-	bear make
+	bear -- make
+	bear -- make quantizer
+	bear -- make downsampler
 
 force: clean $(MAIN)
