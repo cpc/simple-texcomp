@@ -12,7 +12,7 @@
 #define NCH_RGB  3
 
 /* ============================================================================
-	ASTC compressed file loading
+	ASTC compressed file handling
     Adapted from https://github.com/ARM-software/astc-encoder
 ============================================================================ */
 struct astc_header
@@ -118,6 +118,43 @@ void print_bin(unsigned int num, unsigned int nb)
 	}
 }
 
+/** Downsample input block XxY into the size of MxN
+ *
+ * Returns 1 in case of error, 0 on success
+ */
+int bilinear_downsample(
+    const float* inp,  // input values
+    int nch,           // number of channels (e.g. 3 for RGB or 1 for grayscale)
+    int w_inp,         // width of the input block (X)
+    int h_inp,         // height of the input block (Y)
+    float* out,        // output values
+    int w_out,         // width of the output block (M; M <= X)
+    int h_out          // height of the output block (N; N <= Y)
+){
+    if ((w_out > w_inp) || (h_out > h_inp))
+    {
+        return 1;
+    }
+
+    float x = 0.5f;
+    float step_x = 1.0f / (float)w_inp;
+    float m = 0.5f;
+    float step_m = 1.0f / (float)w_out;
+
+    float nsteps = step_m / step_x;
+    printf("number of taps: %6.3f\n", nsteps);
+
+    for (int i = 0; i < w_out; ++i)
+    {
+
+
+        m += step_m;
+    }
+
+    return 0;
+}
+
+
 void encode_block_astc(
     const uint8_t block_pixels[NCH_RGB*ASTC_BLOCK_X*ASTC_BLOCK_Y],
     uint32_t out[4]
@@ -134,12 +171,46 @@ void encode_block_astc(
 
     const int wgt_bitcount = wgt_count * wgt_bits;
 
+    const int X = 12;
+    const int Y = 12;
+    const int WX = 8;
+    const int WY = 5;
+    const float wx_step = 1.0f / ((float)WX - 1);
+    const float wy_step = 1.0f / ((float)WY - 1);
+
+    int res = bilinear_downsample(
+        NULL,
+        1,
+        X, Y,
+        NULL,
+        WX, WY
+    );
+    if (res) { printf("ERROR"); }
+
+    // printf("texels: %dx%d,  weights: %dx%d\n", X, Y, WX, WY);
+    // for (int j = 0; j < WY; ++j)
+    // {
+    //     const float wy = j * wy_step;
+    //     const float y = wy * Y;
+    //     printf("%4.2f(%5.2f):", wy, y);
+    //     for (int i = 0; i < WX; ++i)
+    //     {
+    //         const float wx = i * wx_step;
+    //         const float x = wx * X;
+    //         printf("%6.2f(%5.2f)", wx, x);
+    //     }
+    //     printf("\n");
+    // }
+
+    exit(0);
+
     // Weights after decimation
     const uint8_t weights[wgt_count] = {  // wgt_count == 40
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 1, 1, 1, 1, 1, 1, 0,
+        0, 1, 2, 2, 3, 2, 2, 0,
+        0, 1, 1, 1, 1, 1, 1, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
     };
 
 	uint8_t wgt_buf[16];
