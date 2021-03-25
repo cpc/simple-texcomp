@@ -1,7 +1,8 @@
-#include <assert.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdint>
+#include <cstdlib>
+
 #include <sys/time.h>
 
 #include <filesystem>
@@ -14,10 +15,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include "simple_bcn_common.h"
-#include "simple_bc1.h"
-#include "simple_ycocg_bc3.h"
-#include "simple_astc.h"
+#include "simple_texcomp.hpp"
 
 namespace fs = std::filesystem;
 

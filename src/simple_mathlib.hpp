@@ -1,16 +1,13 @@
 /* Common definitions for BCn algorithms
  */
 
-#ifndef SIMPLE_BCN_COMMON_H
-#define SIMPLE_BCN_COMMON_H
+#ifndef SIMPLE_MATHLIB_HPP
+#define SIMPLE_MATHLIB_HPP
 
 #include<stdint.h>
 #include<stdio.h>
 
 #include<cmath>
-
-/* Number of channels used per pixel (each is assumed to be 8 bits) */
-#define NCH_RGB  3
 
 /* Endpoint interpolation constants */
 #define EP_LERP1  1.0 / 3.0
@@ -227,4 +224,4 @@ inline Vec3f rgb565_to_f32(uint16_t color)
     };
 }
 
-#endif // SIMPLE_BCN_COMMON_H
+#endif // SIMPLE_MATHLIB_HPP

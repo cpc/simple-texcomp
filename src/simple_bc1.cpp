@@ -1,15 +1,13 @@
 // BC1 compression, based on:
 // https://www.nvidia.com/object/real-time-ycocg-dxt-compression.html
 
-#ifndef SIMPLE_BC1_H
-#define SIMPLE_BC1_H
-
-#include "simple_bcn_common.h"
+#include "simple_texcomp.hpp"
+#include "simple_mathlib.hpp"
 
 /* Optional refinement (can improve quality at small runtime cost)
  * 1 - enable, 0 - disable
  */
-#define SELECT_DIAG  1
+#define BC1_SELECT_DIAG  1
 
 /* Rounding the bounding box inset outwards (= (8.0/255.0)/16.0) */
 #define INSET_MARGIN  (8.0 / 255.0) / 16.0
@@ -34,7 +32,7 @@ static inline uint32_t f32_to_rgb565(Vec3f *color)
     return out;
 }
 
-#if SELECT_DIAG == 1
+#if BC1_SELECT_DIAG == 1
 /* Optional selection of either current or oposite diagonal - small performance
  * cost and minimal quality improvement. */
 static inline void select_diagonal(
@@ -63,7 +61,7 @@ static inline void select_diagonal(
         mincol->y = tmp;
     }
 }
-#endif  // SELECT_DIAG
+#endif  // BC1_SELECT_DIAG
 
 /* Shrink the bounding box (by half the distance of equidistant points) to
  * eliminate influence of outliers */
@@ -147,9 +145,9 @@ void encode_block_bc1(
     // Determine line through color space
     Vec3f mincol, maxcol;
     find_minmaxcolor_bbox(block32f, &mincol, &maxcol);
-#if SELECT_DIAG == 1
+#if BC1_SELECT_DIAG == 1
     select_diagonal(block32f, &mincol, &maxcol);
-#endif  // SELECT_DIAG
+#endif  // BC1_SELECT_DIAG
     inset_bbox(&mincol, &maxcol);
 
     // Write endpoints
@@ -179,5 +177,3 @@ void decode_block_bc1(
         out_pixels[NCH_RGB*i+2] = (uint8_t)(res.z * 255.0);
     }
 }
-
-#endif /* SIMPLE_BC1_H */

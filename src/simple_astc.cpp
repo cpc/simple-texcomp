@@ -1,20 +1,13 @@
-#ifndef SIMPLE_ASTC_H
-#define SIMPLE_ASTC_H
-
 #include <cstring>
-#include <stdint.h>
-#include <stddef.h>
-
 #include <fstream>
 
-#define ASTC_BLOCK_X  12
-#define ASTC_BLOCK_Y  12
-#define NCH_RGB  3
+#include "simple_texcomp.hpp"
 
 /* ============================================================================
 	ASTC compressed file handling
     Adapted from https://github.com/ARM-software/astc-encoder
 ============================================================================ */
+
 struct astc_header
 {
 	uint8_t magic[4];
@@ -30,7 +23,7 @@ static const uint32_t ASTC_MAGIC_ID = 0x5CA1AB13;
 
 int store_astc_image(
 	const uint8_t* data,
-	const size_t data_len,
+	const uint32_t data_len,
     const int dim_x,
     const int dim_y,
 	const char* filename
@@ -109,7 +102,7 @@ static inline int bitrev8(int p)
 	return p;
 }
 
-void print_bin(unsigned int num, unsigned int nb)
+static void print_bin(unsigned int num, unsigned int nb)
 {
 	for (uint b = 0; b < nb; ++b)
 	{
@@ -122,7 +115,7 @@ void print_bin(unsigned int num, unsigned int nb)
  *
  * Returns 1 in case of error, 0 on success
  */
-int bilinear_downsample(
+static int bilinear_downsample(
     const float* inp,  // input values
     int nch,           // number of channels (e.g. 3 for RGB or 1 for grayscale)
     int w_inp,         // width of the input block (X)
@@ -289,5 +282,3 @@ void encode_block_astc(
 //     uint8_t out_pixels[NCH_RGB*16]
 // ){
 // }
-
-#endif // SIMPLE_ASTC_H

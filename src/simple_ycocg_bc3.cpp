@@ -1,9 +1,8 @@
 // YCoCg-BC3 compression, based on:
 // https://www.nvidia.com/object/real-time-ycocg-dxt-compression.html
-#ifndef SIMPLE_YCOCG_BC3_H
-#define SIMPLE_YCOCG_BC3_H
 
-#include "simple_bcn_common.h"
+#include "simple_texcomp.hpp"
+#include "simple_mathlib.hpp"
 
 /* Rounding the bounding box inset outwards
  * = (8.0/255.0)/16.0 for CoCg and (16.0/255.0)/32.0 for Y */
@@ -351,5 +350,3 @@ void decode_block_ycocg_bc3(
         out_pixels[NCH_RGB*i+2] = (uint8_t)(b * 255.0);
     }
 }
-
-#endif // SIMPLE_YCOCG_BC3_H

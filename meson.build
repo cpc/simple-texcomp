@@ -6,12 +6,38 @@ project(
   'cpp',
   default_options: [
     'cpp_std=c++17', # due to std::filesystem, otherwise could be lower
-    'buildtype=release',
+    'buildtype=debugoptimized',
+    'warning_level=3',
   ]
 )
 
-includes = include_directories('extern/stb')
+add_project_arguments(
+  ['-Wdouble-promotion', '-Wfloat-conversion'],
+  language: 'cpp'
+)
 
-executable('downsampler', 'src/utils/downsampler.cpp', include_directories: includes)
-executable('quantizer', 'src/utils/quantizer.cpp', include_directories: includes)
-executable('transcoder', 'src/transcoder.cpp', include_directories: includes)
+includes = include_directories('src')
+stb_includes = include_directories('extern/stb', is_system: true)
+
+src_downsampler = [
+  'src/utils/downsampler.cpp',
+]
+
+src_transcoder = [
+  'src/transcoder.cpp',
+  'src/simple_astc.cpp',
+  'src/simple_bc1.cpp',
+  'src/simple_ycocg_bc3.cpp',
+]
+
+executable(
+  'downsampler',
+  src_downsampler,
+  include_directories: [ includes, stb_includes ],
+)
+
+executable(
+  'transcoder',
+  src_transcoder,
+  include_directories: [ includes, stb_includes ],
+)
