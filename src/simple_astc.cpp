@@ -135,7 +135,7 @@ static int bilinear_downsample(
     float step_m = 1.0f / (float)w_out;
 
     float nsteps = step_m / step_x;
-    printf("number of taps: %6.3f\n", nsteps);
+    printf("number of taps: %6.3f\n", (double)nsteps);
 
     for (int i = 0; i < w_out; ++i)
     {

@@ -28,9 +28,9 @@ union bc_block_t
 static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
 {
     return Vec3f {
-        rgb.dot(Vec3f {  0.25f, 0.50f,  0.25f }),
-        rgb.dot(Vec3f {  0.50f, 0.00f, -0.50f }) + OFFSET,
-        rgb.dot(Vec3f { -0.25f, 0.50f, -0.25f }) + OFFSET,
+        rgb.dot(Vec3f {  0.25, 0.50,  0.25 }),
+        rgb.dot(Vec3f {  0.50, 0.00, -0.50 }) + OFFSET,
+        rgb.dot(Vec3f { -0.25, 0.50, -0.25 }) + OFFSET,
     };
 }
 
@@ -57,7 +57,7 @@ static inline void select_cocg_diagonal(
     Vec2f *min_cocg,
     Vec2f *max_cocg
 ){
-    Vec2f center = (*min_cocg + *max_cocg) * 0.5f;
+    Vec2f center = (*min_cocg + *max_cocg) * 0.5;
 
     double cov = 0.0;
     for (int i = 0; i < 16; ++i) {

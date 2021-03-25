@@ -136,10 +136,10 @@ int bilinear_downsample(
     printf("\ninp size: %dx%d, out size: %dx%d\n", w_inp, h_inp, w_out, h_out);
 
     float m = 0.0f;
-    printf("\nstep_x: %6.3f, step_m: %6.3f\n", step_x, step_m);
+    printf("\nstep_x: %6.3f, step_m: %6.3f\n", (double)step_x, (double)step_m);
     for (int i = 0; i < w_out; ++i)
     {
-        printf("  m[%2d]: %6.3f\n", i, m);
+        printf("  m[%2d]: %6.3f\n", i, (double)m);
         float x = 0.0f;
         uint8_t count = 0;
         for (int j = 0; j < w_inp; ++j)
@@ -147,7 +147,8 @@ int bilinear_downsample(
             float weight = tent(x, m, step_m);
             if (weight > 0.0f)
             {
-                printf("- x[%2d]: %13.10f  tent: %13.10f\n", j, x, weight);
+                printf("- x[%2d]: %13.10f  tent: %13.10f\n",
+                    j, (double)x, (double)weight);
                 bilin_idx_x[i][count] = j;
                 bilin_weights_x[i][count] = weight;
                 ++count;
@@ -159,10 +160,10 @@ int bilinear_downsample(
     }
 
     float n = 0.0f;
-    printf("\nstep_y: %6.3f, step_n: %6.3f\n", step_y, step_n);
+    printf("\nstep_y: %6.3f, step_n: %6.3f\n", (double)step_y, (double)step_n);
     for (int i = 0; i < h_out; ++i)
     {
-        printf("  n[%2d]: %6.3f\n", i, n);
+        printf("  n[%2d]: %6.3f\n", i, (double)n);
         float y = 0.0f;
         uint8_t count = 0;
         for (int j = 0; j < h_inp; ++j)
@@ -170,7 +171,8 @@ int bilinear_downsample(
             float weight = tent(y, n, step_n);
             if (weight > 0.0f)
             {
-                printf("- y[%2d]: %13.10f  tent: %13.10f\n", j, y, weight);
+                printf("- y[%2d]: %13.10f  tent: %13.10f\n",
+                    j, (double)y, (double)weight);
                 bilin_idx_y[i][count] = j;
                 bilin_weights_y[i][count] = weight;
                 ++count;
@@ -234,7 +236,7 @@ int bilinear_downsample(
                 {
                     printf("        ");
                 }
-                printf("%7.5f, ", bilin_weights_x[i][j]);
+                printf("%7.5f, ", (double)bilin_weights_x[i][j]);
                 if (j % 6 == 5)
                 {
                     printf("\n");
@@ -254,7 +256,7 @@ int bilinear_downsample(
                 {
                     printf("        ");
                 }
-                printf("%7.5f, ", bilin_weights_y[i][j]);
+                printf("%7.5f, ", (double)bilin_weights_y[i][j]);
                 if (j % 6 == 5)
                 {
                     printf("\n");
@@ -419,7 +421,8 @@ int main(int argc, char **argv)
         float out_pixel_flt = out_pixels_flt.at(i);
         if (out_pixel_flt > 1.0f)
         {
-            printf("ERROR: Result pixel > 1.0: %ld, %.6f\n", i, out_pixel_flt);
+            printf("ERROR: Result pixel > 1.0: %ld, %.6f\n",
+                i, (double)out_pixel_flt);
         }
         out_pixels.at(i) = (uint8_t)(out_pixel_flt * 255.0f);
     }

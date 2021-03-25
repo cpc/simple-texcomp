@@ -40,7 +40,7 @@ static inline void select_diagonal(
     Vec3f *mincol,
     Vec3f *maxcol
 ){
-    Vec3f center = (*mincol + *maxcol) * 0.5f;
+    Vec3f center = (*mincol + *maxcol) * 0.5;
 
     Vec2f cov = { 0.0, 0.0 };
     for (int i = 0; i < 16; ++i) {
