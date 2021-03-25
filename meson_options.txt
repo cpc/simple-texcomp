@@ -1,0 +1,6 @@
+option(
+  'bc1_sel',
+  type: 'boolean',
+  value: true,
+  description: 'Do an additional select diagonal step in BC1 encoding.',
+)
