@@ -6,16 +6,33 @@
 /* Number of channels if a RGB pixel. Used for calculating data sizes */
 #define NCH_RGB  3
 
+/* Compile-time switch between float and double for the calculations
+ *
+ * EPSILON is used for comparing floating point numbers
+ */
+#if USE_DOUBLE == 1
+typedef double decimal;
+const decimal EPSILON = 1e-12;
+#else
+typedef float decimal;
+const decimal EPSILON = 1e-6;
+#endif
+
 /******************************************************************************
  * ASTC
  *
- * Decoding function is purposefully missing. Instead, ARM decoder should be
- * used.
+ * Decoding function is purposefully missing. Instead, encoded images are saved
+ * as .astc files and can be decoded with the reference ARM decoder.
  *****************************************************************************/
 
 /* Input ASTC block size */
 #define ASTC_BLOCK_X  12
 #define ASTC_BLOCK_Y  12
+
+/* Maximum input block size */
+#define ASTC_MAX_BLOCK_DIM 12
+/* Maximum dimension of the weight grid stored in an ASTC block */
+#define ASTC_MAX_GRID_DIM  10
 
 #if USE_DOUBLE == 1
 typedef double decimal;
@@ -35,15 +52,11 @@ int store_astc_image(
 	const char* filename
 );
 
+/* Encode a block of pixels into the ASTC format */
 void encode_block_astc(
     const uint8_t block_pixels[NCH_RGB*ASTC_BLOCK_X*ASTC_BLOCK_Y],
     uint32_t out[4]
 );
-
-// void decode_block_astc(
-//     const uint32_t enc_block[4],
-//     uint8_t out_pixels[NCH_RGB*16]
-// );
 
 
 /******************************************************************************
@@ -86,5 +99,53 @@ void decode_block_ycocg_bc3(
     uint8_t out_pixels[NCH_RGB*16]
 );
 
+
+/******************************************************************************
+ * Bilinear interpolation
+ *****************************************************************************/
+
+/* Data structure for keeping pre-computed bilinear weights.
+ *
+ * They are stored separately for X and Y dimension (requires M+N instead of
+ * M*N memory).
+ */
+struct bilinear_weights {
+    // How many pixels go to a calculation of each weight
+    uint8_t bilin_pixel_count_x[ASTC_MAX_GRID_DIM];
+    uint8_t bilin_pixel_count_y[ASTC_MAX_GRID_DIM];
+    // Each bilin_idx_x[i] stores an array of indices that point to locations
+    // of pixels used to calculate that weight
+    uint8_t bilin_idx_x[ASTC_MAX_GRID_DIM][ASTC_MAX_BLOCK_DIM];
+    uint8_t bilin_idx_y[ASTC_MAX_GRID_DIM][ASTC_MAX_BLOCK_DIM];
+    // Each bilin_weights_x[i] stores the actual weight values the previous
+    // array points at
+    decimal bilin_weights_x[ASTC_MAX_GRID_DIM][ASTC_MAX_BLOCK_DIM];
+    decimal bilin_weights_y[ASTC_MAX_GRID_DIM][ASTC_MAX_BLOCK_DIM];
+};
+
+/** Pre-compute bilinear interpolation weights
+ */
+int populate_bilinear_weights(
+    int w_inp,             // input block width
+    int h_inp,             // input block height
+    bilinear_weights* bw,  // output data structure
+    int w_out,             // interpolated block width
+    int h_out              // interpolated block height
+);
+
+/** Downsample input block XxY into the size of MxN
+ *
+ * Assumes only 1 channel
+ * Returns 1 in case of error, 0 on success
+ */
+void bilinear_downsample(
+    const decimal* inp,  // input values
+    int w_inp,           // width of the input block (X)
+    int h_inp,           // height of the input block (Y)
+    const bilinear_weights* bw, // table with pre-computed filter weights
+    decimal* out,        // output values
+    int w_out,           // width of the output block (M; M <= X)
+    int h_out            // height of the output block (N; N <= Y)
+);
 
 #endif // SIMPLE_TEXCOMP_HPP

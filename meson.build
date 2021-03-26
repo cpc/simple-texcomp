@@ -36,6 +36,7 @@ includes = include_directories('src')
 stb_includes = include_directories('extern/stb', is_system: true)
 
 src_downsampler = [
+  'src/simple_bilinear.cpp',
   'src/utils/downsampler.cpp',
 ]
 
