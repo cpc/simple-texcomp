@@ -71,6 +71,8 @@ int store_astc_image(
 
 /* ========================================================================= */
 
+static bilinear_weights bilin_weights;
+
 // Taken from astcenc:
 // routine to write up to 8 bits
 static inline void write_bits(
@@ -111,42 +113,21 @@ static void print_bin(unsigned int num, unsigned int nb)
 	}
 }
 
-/** Downsample input block XxY into the size of MxN
- *
- * Returns 1 in case of error, 0 on success
- */
-static int bilinear_downsample(
-    const float* inp,  // input values
-    int nch,           // number of channels (e.g. 3 for RGB or 1 for grayscale)
-    int w_inp,         // width of the input block (X)
-    int h_inp,         // height of the input block (Y)
-    float* out,        // output values
-    int w_out,         // width of the output block (M; M <= X)
-    int h_out          // height of the output block (N; N <= Y)
+int init_astc(
+    int block_size_x,
+    int block_size_y,
+    int weight_grid_x,
+    int weight_grid_y
 ){
-    if ((w_out > w_inp) || (h_out > h_inp))
-    {
-        return 1;
-    }
-
-    float x = 0.5f;
-    float step_x = 1.0f / (float)w_inp;
-    float m = 0.5f;
-    float step_m = 1.0f / (float)w_out;
-
-    float nsteps = step_m / step_x;
-    printf("number of taps: %6.3f\n", (double)nsteps);
-
-    for (int i = 0; i < w_out; ++i)
-    {
-
-
-        m += step_m;
-    }
-
-    return 0;
+    int ret = populate_bilinear_weights(
+        block_size_x,
+        block_size_y,
+        &bilin_weights,
+        weight_grid_x,
+        weight_grid_y
+    );
+    return ret;
 }
-
 
 void encode_block_astc(
     const uint8_t block_pixels[NCH_RGB*ASTC_BLOCK_X*ASTC_BLOCK_Y],
@@ -171,14 +152,13 @@ void encode_block_astc(
     const float wx_step = 1.0f / ((float)WX - 1);
     const float wy_step = 1.0f / ((float)WY - 1);
 
-    int res = bilinear_downsample(
-        NULL,
-        1,
-        X, Y,
-        NULL,
-        WX, WY
-    );
-    if (res) { printf("ERROR"); }
+
+    // bilinear_downsample(
+    //     NULL,
+    //     X, Y,
+    //     NULL,
+    //     WX, WY
+    // );
 
     // printf("texels: %dx%d,  weights: %dx%d\n", X, Y, WX, WY);
     // for (int j = 0; j < WY; ++j)
@@ -194,8 +174,6 @@ void encode_block_astc(
     //     }
     //     printf("\n");
     // }
-
-    exit(0);
 
     // Weights after decimation
     const uint8_t weights[wgt_count] = {  // wgt_count == 40

@@ -52,6 +52,14 @@ int store_astc_image(
 	const char* filename
 );
 
+/* Initialize ASTC-specific stuff */
+int init_astc(
+    int block_size_x,
+    int block_size_y,
+    int weight_grid_x,
+    int weight_grid_y
+);
+
 /* Encode a block of pixels into the ASTC format */
 void encode_block_astc(
     const uint8_t block_pixels[NCH_RGB*ASTC_BLOCK_X*ASTC_BLOCK_Y],

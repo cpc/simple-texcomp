@@ -27,7 +27,7 @@ typedef enum enc_format_t {
 } enc_format_t;
 
 /* Define encoding format here */
-const enc_format_t ENC_FORMAT = BC1;
+const enc_format_t ENC_FORMAT = ASTC;
 
 /* Exit with error, optionally printing usage */
 void err_exit(const std::string& err_msg, bool print_usage=false)
@@ -298,9 +298,10 @@ int main(int argc, char **argv)
         err_exit("Can't open output directory", true);
     }
 
-    // Print out some format info
+    // Init & print out format-specific info
     if (ENC_FORMAT == ASTC)
     {
+        init_astc(12, 12, 8, 5);
         printf("WARNING: ASTC format decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
                " directory.\n");

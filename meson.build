@@ -42,6 +42,7 @@ src_downsampler = [
 
 src_transcoder = [
   'src/transcoder.cpp',
+  'src/simple_bilinear.cpp',
   'src/simple_astc.cpp',
   'src/simple_bc1.cpp',
   'src/simple_ycocg_bc3.cpp',
