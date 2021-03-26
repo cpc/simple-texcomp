@@ -27,7 +27,7 @@ typedef enum enc_format_t {
 } enc_format_t;
 
 /* Define encoding format here */
-const enc_format_t ENC_FORMAT = ASTC;
+const enc_format_t ENC_FORMAT = BC1;
 
 /* Exit with error, optionally printing usage */
 void err_exit(const std::string& err_msg, bool print_usage=false)
@@ -279,7 +279,7 @@ double get_time()
 {
     timeval tv;
     gettimeofday(&tv, 0);
-    return (double)tv.tv_sec + (double)tv.tv_usec * 1.0e-6;
+    return (double)tv.tv_sec + (double)tv.tv_usec * (double)1.0e-6;
 }
 
 int main(int argc, char **argv)
@@ -298,11 +298,17 @@ int main(int argc, char **argv)
         err_exit("Can't open output directory", true);
     }
 
+    // Print out some format info
     if (ENC_FORMAT == ASTC)
     {
         printf("WARNING: ASTC format decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
                " directory.\n");
+    }
+
+    if (ENC_FORMAT == BC1)
+    {
+        printf("INFO: BC1 is compiled with SELECT_DIAG=%d\n", BC1_SELECT_DIAG);
     }
 
     // Error code
@@ -428,7 +434,7 @@ int main(int argc, char **argv)
     printf("\n");
     printf("Encoded images                : %9d\n", num_enc_images);
     printf("Average encoding time (sec)   : %9.5f\n", total_enc_duration / num_enc_images);
-    printf("Average encoding rate (Mpx/s) : %9.5f\n", total_num_enc_pixels / total_enc_duration / 1e6);
+    printf("Average encoding rate (Mpx/s) : %9.5f\n", total_num_enc_pixels / total_enc_duration / (double)1e6);
     printf("Average total time (sec)      : %9.5f\n", total_duration / num_enc_images);
 
     return err;

@@ -17,6 +17,12 @@
 #define ASTC_BLOCK_X  12
 #define ASTC_BLOCK_Y  12
 
+#if USE_DOUBLE == 1
+typedef double decimal;
+#else
+typedef float decimal;
+#endif
+
 /** Store compressed file into .astc format
  *
  * Taken from https://github.com/ARM-software/astc-encoder
@@ -47,7 +53,9 @@ void encode_block_astc(
 /* Optional refinement (can improve quality at small runtime cost)
  * 1 - enable, 0 - disable
  */
+#ifndef BC1_SELECT_DIAG
 #define BC1_SELECT_DIAG  1
+#endif
 
 /* Encode a block of 4x4 pixels into the BC1 format */
 void encode_block_bc1(

@@ -3,6 +3,7 @@
  * Designed to work on small images.
  */
 
+#include <array>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -21,6 +22,14 @@
 // maximum input block size
 #define MAX_BLOCK_SIZE        12
 
+#if USE_DOUBLE == 1
+typedef double decimal;
+static const decimal EPSILON = 1e-12;
+#else
+typedef float decimal;
+static const decimal EPSILON = 1e-6;
+#endif
+
 /* Exit with error, optionally printing usage */
 void err_exit(const char* err_msg, bool print_usage=false)
 {
@@ -36,10 +45,9 @@ void err_exit(const char* err_msg, bool print_usage=false)
 }
 
 /** Test if two floating point numbers are almost equal */
-static inline bool is_close_enough(float a, float b)
+static inline bool is_close_enough(decimal a, decimal b)
 {
-    static float epsilon = 1e-6;
-    return ( std::fabs(a - b) <= epsilon );
+    return ( std::fabs(a - b) <= EPSILON );
 }
 
 /** Calculate "tent" function, i.e. piece-wise linear interpolation
@@ -47,11 +55,11 @@ static inline bool is_close_enough(float a, float b)
  * The function is 1.0 at the center and goes linearly to 0.0 towards
  * (center - half_span) and (center + half_span).
  */
-static float tent(float x, float center, float half_span)
+static decimal tent(decimal x, decimal center, decimal half_span)
 {
     if ( is_close_enough(x, center) )
     {
-        return 1.0f;
+        return 1.0;
     }
 
     if ( x > center )
@@ -60,10 +68,10 @@ static float tent(float x, float center, float half_span)
         x = center - (x - center);
     }
 
-    float left = center - half_span;
+    decimal left = center - half_span;
     if ( is_close_enough(x, left) || (x < left) )
     {
-        return 0.0f;
+        return 0.0;
     }
 
     return (x - left) / (center - left);
@@ -74,11 +82,11 @@ static float tent(float x, float center, float half_span)
  * Returns 1 in case of error, 0 on success
  */
 int bilinear_downsample(
-    const float* inp,  // input values
+    const decimal* inp,  // input values
     int nch,           // number of channels (e.g. 3 for RGB or 1 for grayscale)
     int w_inp,         // width of the input block (X)
     int h_inp,         // height of the input block (Y)
-    float* out,        // output values
+    decimal* out,        // output values
     int w_out,         // width of the output block (M; M <= X)
     int h_out          // height of the output block (N; N <= Y)
 ){
@@ -109,8 +117,8 @@ int bilinear_downsample(
     uint8_t bilin_idx_y[MAX_WEIGHT_GRID_SIZE][MAX_BLOCK_SIZE];
     // Each bilin_weights_x[i] stores the actual weight values the previous
     // array points at
-    float bilin_weights_x[MAX_WEIGHT_GRID_SIZE][MAX_BLOCK_SIZE];
-    float bilin_weights_y[MAX_WEIGHT_GRID_SIZE][MAX_BLOCK_SIZE];
+    decimal bilin_weights_x[MAX_WEIGHT_GRID_SIZE][MAX_BLOCK_SIZE];
+    decimal bilin_weights_y[MAX_WEIGHT_GRID_SIZE][MAX_BLOCK_SIZE];
 
     for (int i = 0; i < MAX_WEIGHT_GRID_SIZE; ++i)
     {
@@ -128,24 +136,24 @@ int bilinear_downsample(
     // Popuate the data structures above -- can be done at init phase or even
     // set as a const array at compile time if the block sizes are fixed.
     // Also, the weights can be normalized  at this step instead of runtime.
-    float step_x = 1.0f / ((float)(w_inp - 1));
-    float step_y = 1.0f / ((float)(h_inp - 1));
-    float step_m = 1.0f / ((float)(w_out - 1));
-    float step_n = 1.0f / ((float)(h_out - 1));
+    decimal step_x = 1.0 / ((decimal)(w_inp - 1));
+    decimal step_y = 1.0 / ((decimal)(h_inp - 1));
+    decimal step_m = 1.0 / ((decimal)(w_out - 1));
+    decimal step_n = 1.0 / ((decimal)(h_out - 1));
 
     printf("\ninp size: %dx%d, out size: %dx%d\n", w_inp, h_inp, w_out, h_out);
 
-    float m = 0.0f;
+    decimal m = 0.0;
     printf("\nstep_x: %6.3f, step_m: %6.3f\n", (double)step_x, (double)step_m);
     for (int i = 0; i < w_out; ++i)
     {
         printf("  m[%2d]: %6.3f\n", i, (double)m);
-        float x = 0.0f;
+        decimal x = 0.0;
         uint8_t count = 0;
         for (int j = 0; j < w_inp; ++j)
         {
-            float weight = tent(x, m, step_m);
-            if (weight > 0.0f)
+            decimal weight = tent(x, m, step_m);
+            if (weight > 0.0)
             {
                 printf("- x[%2d]: %13.10f  tent: %13.10f\n",
                     j, (double)x, (double)weight);
@@ -159,17 +167,17 @@ int bilinear_downsample(
         m += step_m;
     }
 
-    float n = 0.0f;
+    decimal n = 0.0;
     printf("\nstep_y: %6.3f, step_n: %6.3f\n", (double)step_y, (double)step_n);
     for (int i = 0; i < h_out; ++i)
     {
         printf("  n[%2d]: %6.3f\n", i, (double)n);
-        float y = 0.0f;
+        decimal y = 0.0;
         uint8_t count = 0;
         for (int j = 0; j < h_inp; ++j)
         {
-            float weight = tent(y, n, step_n);
-            if (weight > 0.0f)
+            decimal weight = tent(y, n, step_n);
+            if (weight > 0.0)
             {
                 printf("- y[%2d]: %13.10f  tent: %13.10f\n",
                     j, (double)y, (double)weight);
@@ -269,14 +277,14 @@ int bilinear_downsample(
 
     // Now go ahead and finally filter the values
     // First, rows.
-    float tmp[h_inp*w_out];  // rows are filtered but columns are not
+    std::vector<decimal> tmp(h_inp*w_out);  // rows are filtered but columns are not
 
     printf("Input image:\n");
     for (int y = 0; y < h_inp; ++y)
     {
         for (int x = 0; x < w_inp; ++x)
         {
-            printf("%4d", (int)(inp[y*w_inp+x] * 255.0f));
+            printf("%4d", (int)(inp[y*w_inp+x] * 255.0));
         }
         printf("\n");
     }
@@ -288,13 +296,13 @@ int bilinear_downsample(
         {
             uint8_t pixel_count = bilin_pixel_count_x[m];
             // printf("weight %d, npixels: %d\n", m, pixel_count);
-            float weight_sum = 1e-11f;  // prevent division by 0
-            float out_pixel = 0.0f;
+            decimal weight_sum = 1e-11;  // prevent division by 0
+            decimal out_pixel = 0.0;
             for (uint8_t x = 0; x < pixel_count; ++x)
             {
                 uint8_t idx = bilin_idx_x[m][x];
-                float inp_pixel = inp[y*w_inp+idx];
-                float weight = bilin_weights_x[m][x];
+                decimal inp_pixel = inp[y*w_inp+idx];
+                decimal weight = bilin_weights_x[m][x];
                 out_pixel += inp_pixel * weight;
                 weight_sum += weight;
                 // printf("%3d %3d %3d %6.3f\n", x, idx, y*w_inp+idx, inp_pixel);
@@ -312,7 +320,7 @@ int bilinear_downsample(
     {
         for (int x = 0; x < w_out; ++x)
         {
-            printf("%4d", (int)(tmp[y*w_out+x] * 255.0f));
+            printf("%4d", (int)(tmp[y*w_out+x] * 255.0));
         }
         printf("\n");
     }
@@ -325,13 +333,13 @@ int bilinear_downsample(
         {
             uint8_t pixel_count = bilin_pixel_count_y[n];
             // printf("weight %d, npixels: %d\n", n, pixel_count);
-            float weight_sum = 1e-11f;  // prevent division by 0
-            float out_pixel = 0.0f;
+            decimal weight_sum = 1e-11;  // prevent division by 0
+            decimal out_pixel = 0.0;
             for (uint8_t y = 0; y < pixel_count; ++y)
             {
                 uint8_t idx = bilin_idx_y[n][y];
-                float inp_pixel = tmp[idx*w_out+m];
-                float weight = bilin_weights_y[n][y];
+                decimal inp_pixel = tmp[idx*w_out+m];
+                decimal weight = bilin_weights_y[n][y];
                 out_pixel += inp_pixel * weight;
                 weight_sum += weight;
                 // printf("%3d %3d %3d %6.3f %3d\n", n, idx, idx*w_inp+m,
@@ -340,7 +348,7 @@ int bilinear_downsample(
             // the weights do not sum up to 1 => we need to normalize
             out_pixel /= weight_sum;
             out[n*w_out+m] = out_pixel;
-            // printf("%6.3f (%3d)\n", out_pixel, (int)(out_pixel * 255.0f));
+            // printf("%6.3f (%3d)\n", out_pixel, (int)(out_pixel * 255.0));
         }
         // printf("\n");
     }
@@ -350,7 +358,7 @@ int bilinear_downsample(
     {
         for (int x = 0; x < w_out; ++x)
         {
-            printf("%4d", (int)(out[y*w_out+x] * 255.0f));
+            printf("%4d", (int)(out[y*w_out+x] * 255.0));
         }
         printf("\n");
     }
@@ -394,13 +402,13 @@ int main(int argc, char **argv)
     printf("%dx%d, %d channels\n", inp_w, inp_h, nch);
 
     // Downsample
-    std::vector<float> inp_pixels_flt(inp_w*inp_h*nch);
+    std::vector<decimal> inp_pixels_flt(inp_w*inp_h*nch);
     for (int i = 0; i < inp_h*inp_w*nch; ++i)
     {
-        inp_pixels_flt.at(i) = (float)(inp_pixels[i]) / 255.0f;
+        inp_pixels_flt.at(i) = (decimal)(inp_pixels[i]) / 255.0;
     }
 
-    std::vector<float> out_pixels_flt(M*N*nch);
+    std::vector<decimal> out_pixels_flt(M*N*nch);
 
     int res = bilinear_downsample(
         inp_pixels_flt.data(),
@@ -418,13 +426,13 @@ int main(int argc, char **argv)
     std::vector<uint8_t> out_pixels(M*N*nch);
     for (size_t i = 0; i < out_pixels.size(); ++i)
     {
-        float out_pixel_flt = out_pixels_flt.at(i);
-        if (out_pixel_flt > 1.0f)
+        decimal out_pixel_flt = out_pixels_flt.at(i);
+        if (out_pixel_flt > 1.0)
         {
             printf("ERROR: Result pixel > 1.0: %ld, %.6f\n",
                 i, (double)out_pixel_flt);
         }
-        out_pixels.at(i) = (uint8_t)(out_pixel_flt * 255.0f);
+        out_pixels.at(i) = (uint8_t)(out_pixel_flt * 255.0);
     }
     res = stbi_write_png(
         out_file.data(),

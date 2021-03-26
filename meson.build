@@ -12,9 +12,25 @@ project(
 )
 
 add_project_arguments(
-  ['-Wdouble-promotion', '-Wfloat-conversion'],
+  ['-Wdouble-promotion', '-Wfloat-conversion', '-Wnarrowing'],
   language: 'cpp'
 )
+
+if get_option('bc1_sel')
+  add_project_arguments('-DBC1_SELECT_DIAG=1', language: 'cpp')
+else
+  add_project_arguments('-DBC1_SELECT_DIAG=0', language: 'cpp')
+endif
+
+if get_option('use_double')
+  add_project_arguments('-DUSE_DOUBLE=1', language: 'cpp')
+else
+  add_project_arguments(
+    '-fsingle-precision-constant',
+    language: 'cpp'
+  )
+  add_project_arguments('-DUSE_DOUBLE=0', language: 'cpp')
+endif
 
 includes = include_directories('src')
 stb_includes = include_directories('extern/stb', is_system: true)

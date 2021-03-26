@@ -4,3 +4,10 @@ option(
   value: true,
   description: 'Do an additional select diagonal step in BC1 encoding.',
 )
+
+option(
+  'use_double',
+  type: 'boolean',
+  value: true,
+  description: 'Use double in calculations or set it to false to use float.',
+)

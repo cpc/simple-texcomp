@@ -4,11 +4,6 @@
 #include "simple_texcomp.hpp"
 #include "simple_mathlib.hpp"
 
-/* Optional refinement (can improve quality at small runtime cost)
- * 1 - enable, 0 - disable
- */
-#define BC1_SELECT_DIAG  1
-
 /* Rounding the bounding box inset outwards (= (8.0/255.0)/16.0) */
 #define INSET_MARGIN  (8.0 / 255.0) / 16.0
 
@@ -25,9 +20,9 @@ static inline uint32_t f32_to_rgb565(Vec3f *color)
     g = (g << 2) | (g >> 4);
     b = (b << 3) | (b >> 2);
 
-    color->x = (double)(r) * (1.0 / 255.0);
-    color->y = (double)(g) * (1.0 / 255.0);
-    color->z = (double)(b) * (1.0 / 255.0);
+    color->x = (decimal)(r) * (1.0 / 255.0);
+    color->y = (decimal)(g) * (1.0 / 255.0);
+    color->z = (decimal)(b) * (1.0 / 255.0);
 
     return out;
 }
@@ -50,13 +45,13 @@ static inline void select_diagonal(
     }
 
     if (cov.x < 0.0) {
-        double tmp = maxcol->x;
+        decimal tmp = maxcol->x;
         maxcol->x = mincol->x;
         mincol->x = tmp;
     }
 
     if (cov.y < 0.0) {
-        double tmp = maxcol->y;
+        decimal tmp = maxcol->y;
         maxcol->y = mincol->y;
         mincol->y = tmp;
     }
@@ -107,7 +102,7 @@ static inline uint32_t emit_indices(
     // Compute indices
     uint32_t indices = 0;
     for (int i = 0; i < 16; ++i) {
-        double dist[4];
+        decimal dist[4];
         dist[0] = distsq3f(block[i], palette[0]);
         dist[1] = distsq3f(block[i], palette[1]);
         dist[2] = distsq3f(block[i], palette[2]);
@@ -137,9 +132,9 @@ void encode_block_bc1(
     Vec3f block32f[16];
     for (int i = 0; i < 16; ++i)
     {
-        block32f[i].x = (double)block_pixels[NCH_RGB*i] / 255.0;
-        block32f[i].y = (double)block_pixels[NCH_RGB*i+1] / 255.0;
-        block32f[i].z = (double)block_pixels[NCH_RGB*i+2] / 255.0;
+        block32f[i].x = (decimal)block_pixels[NCH_RGB*i] / 255.0;
+        block32f[i].y = (decimal)block_pixels[NCH_RGB*i+1] / 255.0;
+        block32f[i].z = (decimal)block_pixels[NCH_RGB*i+2] / 255.0;
     }
 
     // Determine line through color space
