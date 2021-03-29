@@ -1,7 +1,14 @@
 #include <cstring>
 #include <fstream>
 
+#include "simple_mathlib.hpp"
 #include "simple_texcomp.hpp"
+
+/* Rounding the bounding box inset outwards (= (8.0/255.0)/16.0)
+ *
+ * TODO: Optimize this for different quantizations
+ */
+#define INSET_MARGIN  (8.0 / 255.0) / 16.0
 
 /* ============================================================================
 	ASTC compressed file handling
@@ -71,7 +78,24 @@ int store_astc_image(
 
 /* ========================================================================= */
 
+/* Pre-computed bilinear filter weights */
 static bilinear_weights bilin_weights;
+
+int init_astc(
+    int block_size_x,
+    int block_size_y,
+    int weight_grid_x,
+    int weight_grid_y
+){
+    int ret = populate_bilinear_weights(
+        block_size_x,
+        block_size_y,
+        &bilin_weights,
+        weight_grid_x,
+        weight_grid_y
+    );
+    return ret;
+}
 
 // Taken from astcenc:
 // routine to write up to 8 bits
@@ -113,20 +137,44 @@ static void print_bin(unsigned int num, unsigned int nb)
 	}
 }
 
-int init_astc(
-    int block_size_x,
-    int block_size_y,
-    int weight_grid_x,
-    int weight_grid_y
+/* Find min/max color as a corners of a bounding box of the block */
+static void find_minmaxcolor_bbox_astc(
+    const Vec3f* block,
+    int pixel_count,
+    Vec3f *mincol,
+    Vec3f *maxcol
 ){
-    int ret = populate_bilinear_weights(
-        block_size_x,
-        block_size_y,
-        &bilin_weights,
-        weight_grid_x,
-        weight_grid_y
-    );
-    return ret;
+    *mincol = { 1.0, 1.0, 1.0 };
+    *maxcol = { 0.0, 0.0, 0.0 };
+
+    for (int i = 0; i < pixel_count; ++i)
+    {
+        *mincol = min3f(*mincol, block[i]);
+        *maxcol = max3f(*maxcol, block[i]);
+    }
+}
+
+/* Shrink the bounding box (by half the distance of equidistant points) to
+ * eliminate influence of outliers */
+static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
+{
+    Vec3f inset = (*maxcol - *mincol) * (1.0 / 16.0) - INSET_MARGIN;
+    *mincol = clamp3f(*mincol + inset, 0.0, 1.0);
+    *maxcol = clamp3f(*maxcol - inset, 0.0, 1.0);
+}
+
+/** Quantize decimal value into 2 bits (4 values) */
+static inline uint8_t quantize_2b(decimal x)
+{
+    uint8_t y = (uint8_t)round(x * 15.0);
+    return (y << 4) | (y >> 1);
+}
+
+/** Quantize decimal value into 5 bits (32 values) */
+static inline uint8_t quantize_5b(decimal x)
+{
+    uint8_t y = (uint8_t)round(x * 31.0);
+    return (y << 3) | (y >> 2);
 }
 
 void encode_block_astc(
@@ -138,27 +186,95 @@ void encode_block_astc(
     const uint8_t wgt_grid_h = 5;
     const uint8_t wgt_count = wgt_grid_w * wgt_grid_h;
 
-    const uint8_t color_quant_level = 11;  // range 32
+    // const uint8_t color_quant_level = 11;  // range 32
     const uint8_t ep_bits = 5;
-    const uint8_t wgt_quant_mode = 2;      // range 4
+    // const uint8_t wgt_quant_mode = 2;      // range 4
     const uint8_t wgt_bits = 2;
 
-    const int wgt_bitcount = wgt_count * wgt_bits;
+    const uint8_t block_size_x = 12;
+    const uint8_t block_size_y = 12;
+    const uint8_t pixel_count = block_size_x * block_size_y;
 
-    const int X = 12;
-    const int Y = 12;
-    const int WX = 8;
-    const int WY = 5;
-    const float wx_step = 1.0f / ((float)WX - 1);
-    const float wy_step = 1.0f / ((float)WY - 1);
+    constexpr uint8_t MAX_PIXEL_COUNT = ASTC_MAX_BLOCK_DIM*ASTC_MAX_BLOCK_DIM;
 
+    // Convert the block into floating point
+    Vec3f block_flt[MAX_PIXEL_COUNT];
+    printf("Pixels R:\n");
+    for (int i = 0; i < pixel_count; ++i)
+    {
+        block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / 255.0;
+        block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / 255.0;
+        block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / 255.0;
+        printf("%6.3f" , (double)block_flt[i].x);
+        if ((i % block_size_x) == (block_size_x - 1))
+        {
+            printf("\n");
+        }
+    }
 
-    // bilinear_downsample(
-    //     NULL,
-    //     X, Y,
-    //     NULL,
-    //     WX, WY
-    // );
+    // Determine line through color space
+    Vec3f mincol, maxcol;
+    find_minmaxcolor_bbox_astc(block_flt, pixel_count, &mincol, &maxcol);
+    inset_bbox(&mincol, &maxcol);
+
+    printf("mincol: %5.3f %5.3f %5.3f  maxcol:  %5.3f %5.3f %5.3f\n",
+        (double)mincol.x, (double)mincol.y, (double)mincol.z,
+        (double)maxcol.x, (double)maxcol.y, (double)maxcol.z);
+
+    // Move the endpoints line segments such that mincol is at zero
+    Vec3f ep_vec = maxcol - mincol;
+    // Normalize the endpoint vector
+    // decimal norm = 1.0 / std::sqrt(ep_vec.dot(ep_vec));
+    // Vec3f ep_vec_norm = ep_vec * norm;
+
+    // It works when the norm is squared, why?
+    Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
+
+    printf("ep_vec: %5.3f %5.3f %5.3f  ep_vec_scaled:  %5.3f %5.3f %5.3f\n",
+        (double)ep_vec.x, (double)ep_vec.y, (double)ep_vec.z,
+        (double)ep_vec_scaled.x, (double)ep_vec_scaled.y, (double)ep_vec_scaled.z);
+    // printf("ep_vec_len: %5.3f\n", (1.0 / norm));
+
+    // Project all pixels onto the endpoint vector. For each pixel, the result
+    // tells how far it goes into the endpoint vector direction. Small values
+    // (-> 0.0) mean closer to mincol, large values (-> 1.0) mean closer to
+    // maxcol.
+    // In other words, the resulting array is the array of ideal weights,
+    // assuming there is no quantization.
+    printf("Weights:\n");
+    decimal ideal_weights[MAX_PIXEL_COUNT];
+    for (int i = 0; i < pixel_count; ++i)
+    {
+        ideal_weights[i] = fclamp(
+            (block_flt[i] - mincol).dot(ep_vec_scaled), 0.0, 1.0
+        );
+        printf("%6.3f" , (double)ideal_weights[i]);
+        if ((i % block_size_x) == (block_size_x - 1))
+        {
+            printf("\n");
+        }
+    }
+
+    decimal downsampled_weights[MAX_PIXEL_COUNT];
+    bilinear_downsample(
+        ideal_weights,
+        block_size_x,
+        block_size_y,
+        &bilin_weights,
+        downsampled_weights,
+        wgt_grid_w,
+        wgt_grid_h
+    );
+
+    printf("Decimated weights:\n");
+    for (int i = 0; i < wgt_count; ++i)
+    {
+        printf("%6.3f" , (double)downsampled_weights[i]);
+        if ((i % wgt_grid_w) == (wgt_grid_w - 1))
+        {
+            printf("\n");
+        }
+    }
 
     // printf("texels: %dx%d,  weights: %dx%d\n", X, Y, WX, WY);
     // for (int j = 0; j < WY; ++j)
@@ -176,13 +292,25 @@ void encode_block_astc(
     // }
 
     // Weights after decimation
-    const uint8_t weights[wgt_count] = {  // wgt_count == 40
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 1, 1, 1, 1, 1, 1, 0,
-        0, 1, 2, 2, 3, 2, 2, 0,
-        0, 1, 1, 1, 1, 1, 1, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-    };
+    // const uint8_t weights[wgt_count] = {  // wgt_count == 40
+    //     0, 0, 0, 0, 0, 0, 0, 0,
+    //     0, 1, 1, 1, 1, 1, 1, 0,
+    //     0, 1, 2, 2, 3, 2, 2, 0,
+    //     0, 1, 1, 1, 1, 1, 1, 0,
+    //     0, 0, 0, 0, 0, 0, 0, 0,
+    // };
+
+    uint8_t quantized_weights[MAX_PIXEL_COUNT];
+    printf("Quantized weights:\n");
+    for (int i = 0; i < wgt_count; ++i)
+    {
+        quantized_weights[i] = quantize_2b(downsampled_weights[i]) >> 6;
+        printf("%4d" , quantized_weights[i]);
+        if ((i % wgt_grid_w) == (wgt_grid_w - 1))
+        {
+            printf("\n");
+        }
+    }
 
 	uint8_t wgt_buf[16];
 	uint8_t out_buf[16];
@@ -196,7 +324,7 @@ void encode_block_astc(
     int off = 0;
     for (int i = 0; i < wgt_count; ++i)
     {
-        write_bits(weights[i], wgt_bits, off, wgt_buf);
+        write_bits(quantized_weights[i], wgt_bits, off, wgt_buf);
         off += wgt_bits;
     }
 
@@ -213,10 +341,20 @@ void encode_block_astc(
     const int color_format = 8;
     write_bits(color_format, 4, 13, out_buf);
 
-    // Unquantized endpoints
-    const uint8_t mincol[3] = { 0, 0, 0 };
-    const uint8_t maxcol[3] = { 255, 255, 255 };
-    if (mincol[0] + mincol[1] + mincol[2] > maxcol[0] + maxcol[1] + maxcol[2])
+    // TODO: Move ep quant before weights calculation
+    // Quantized endpoints
+    const uint8_t mincol_int[3] = {
+        quantize_5b(mincol.x),
+        quantize_5b(mincol.y),
+        quantize_5b(mincol.z)
+    };
+    const uint8_t maxcol_int[3] = {
+        quantize_5b(maxcol.x),
+        quantize_5b(maxcol.y),
+        quantize_5b(maxcol.z)
+    };
+    if ( (mincol_int[0] + mincol_int[1] + mincol_int[2])
+        > (maxcol_int[0] + maxcol_int[1] + maxcol_int[2]) )
     {
         printf("ERROR: mincol must be smaller than maxcol\n");
     }
@@ -225,8 +363,8 @@ void encode_block_astc(
     uint8_t endpoints_q[6] = { 0 };
     for (int i = 0; i < 3; ++i)
     {
-        endpoints_q[2*i] = mincol[i] >> 3;
-        endpoints_q[2*i+1] = maxcol[i] >> 3;
+        endpoints_q[2*i] = mincol_int[i] >> 3;
+        endpoints_q[2*i+1] = maxcol_int[i] >> 3;
     }
 
     // write out endpoints
