@@ -34,6 +34,13 @@ const decimal EPSILON = 1e-6;
 /* Maximum dimension of the weight grid stored in an ASTC block */
 #define ASTC_MAX_GRID_DIM  10
 
+/* Optional refinement (can improve quality at small runtime cost)
+ * 1 - enable, 0 - disable
+ */
+#ifndef ASTC_SELECT_DIAG
+#define ASTC_SELECT_DIAG  1
+#endif
+
 #if USE_DOUBLE == 1
 typedef double decimal;
 #else

@@ -132,6 +132,13 @@ struct Vec2f
     }
 };
 
+struct Vec3i
+{
+    int x;
+    int y;
+    int z;
+};
+
 inline decimal fclamp(decimal a, decimal amin, decimal amax)
 {
     const decimal min = a < amin ? amin : a;

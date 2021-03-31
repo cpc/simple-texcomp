@@ -4,7 +4,7 @@
 #include "simple_texcomp.hpp"
 #include "simple_mathlib.hpp"
 
-/* Rounding the bounding box inset outwards (= (8.0/255.0)/16.0) */
+/* */
 #define INSET_MARGIN  (8.0 / 255.0) / 16.0
 
 /* Convert a floating-point color into the RGB565 format */
@@ -28,8 +28,9 @@ static inline uint32_t f32_to_rgb565(Vec3f *color)
 }
 
 #if BC1_SELECT_DIAG == 1
-/* Optional selection of either current or oposite diagonal - small performance
- * cost and minimal quality improvement. */
+/* Optional selection of either current or oposite diagonal - small potential
+ * quality improvement at a small runtime cost
+ */
 static inline void select_diagonal(
     const Vec3f block[16],
     Vec3f *mincol,
@@ -58,8 +59,7 @@ static inline void select_diagonal(
 }
 #endif  // BC1_SELECT_DIAG
 
-/* Shrink the bounding box (by half the distance of equidistant points) to
- * eliminate influence of outliers */
+/* Shrink the bounding box */
 static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 {
     Vec3f inset = (*maxcol - *mincol) * (1.0 / 16.0) - INSET_MARGIN;

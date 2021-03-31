@@ -4,7 +4,7 @@
 #include "simple_texcomp.hpp"
 #include "simple_mathlib.hpp"
 
-/* Rounding the bounding box inset outwards
+/*
  * = (8.0/255.0)/16.0 for CoCg and (16.0/255.0)/32.0 for Y */
 #define INSET_MARGIN_Y  (16.0 / 255.0) / 32.0
 #define INSET_MARGIN_COCG  (8.0 / 255.0) / 16.0
