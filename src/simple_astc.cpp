@@ -136,6 +136,22 @@ static void print_bin(unsigned int num, unsigned int nb)
 	}
 }
 
+static void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
+{
+    Vec3f mincol2 = mincol * 255.0;
+    Vec3f maxcol2 = maxcol * 255.0;
+
+    printf("%s mincol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+        pre,
+        mincol.x, mincol.y, mincol.z,
+        mincol2.x, mincol2.y, mincol2.z
+    );
+    printf("    maxcol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+        maxcol.x, maxcol.y, maxcol.z,
+        maxcol2.x, maxcol2.y, maxcol2.z
+    );
+}
+
 /* Find min/max color as a corners of a bounding box of the block */
 static void find_minmaxcolor_bbox_astc(
     const Vec3f* block,
@@ -181,6 +197,8 @@ static inline bool select_diagonal(
         cov.y += t.y * t.z;
     }
 
+    // printf("    cov_x: %.5f  cov_y: %.5f\n", cov.x, cov.y);
+
     if (cov.x < 0.0) {
         decimal tmp = maxcol->x;
         maxcol->x = mincol->x;
@@ -200,11 +218,14 @@ static inline bool select_diagonal(
 #endif
 
 /* TODO: Fix this */
-/** Quantize decimal value into 2 bits (4 values) */
+/** Quantize decimal value into 2 bits (4 values)
+ *
+ * The input decimal does not need to be updated in our use case
+ */
 static inline uint8_t quantize_2b(decimal x)
 {
-    uint8_t y = (uint8_t)round(x * 15.0);
-    return (y << 4) | (y >> 1);
+    // TODO: make round (+ 0.5)
+    return (uint8_t)round(x * 3.0);
 }
 
 /** Quantize a decimal value into 5 bits (32 values)
@@ -214,17 +235,18 @@ static inline uint8_t quantize_2b(decimal x)
  */
 static inline Vec3i quantize_5b(Vec3f *vec)
 {
+    // TODO: make round (+ 0.5)
     int quant_x = (int)round(vec->x * 31.0);
     int quant_y = (int)round(vec->y * 31.0);
     int quant_z = (int)round(vec->z * 31.0);
 
-    quant_x = (quant_x << 3) | (quant_x >> 2);
-    quant_y = (quant_y << 3) | (quant_y >> 2);
-    quant_z = (quant_z << 3) | (quant_z >> 2);
+    int dequant_x = (quant_x << 3) | (quant_x >> 2);
+    int dequant_y = (quant_y << 3) | (quant_y >> 2);
+    int dequant_z = (quant_z << 3) | (quant_z >> 2);
 
-    vec->x = (decimal)(quant_x) * (1.0 / 255.0);
-    vec->y = (decimal)(quant_y) * (1.0 / 255.0);
-    vec->z = (decimal)(quant_z) * (1.0 / 255.0);
+    vec->x = (decimal)(dequant_x) * (1.0 / 255.0);
+    vec->y = (decimal)(dequant_y) * (1.0 / 255.0);
+    vec->z = (decimal)(dequant_z) * (1.0 / 255.0);
 
     return Vec3i { quant_x, quant_y, quant_z };
 }
@@ -251,35 +273,54 @@ void encode_block_astc(
 
     // Convert the block into floating point
     Vec3f block_flt[MAX_PIXEL_COUNT];
+    Vec3f sum = { 0.0, 0.0, 0.0 };
+    Vec3f sq_sum = { 0.0, 0.0, 0.0 };
+    // TODO: this loop can be merged with find_minmaxcolor_bbox_astc()
     for (int i = 0; i < pixel_count; ++i)
     {
         block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / 255.0;
         block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / 255.0;
         block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / 255.0;
+
+        sum = sum + block_flt[i];
+        Vec3f sq = {
+            block_flt[i].x * block_flt[i].x,
+            block_flt[i].y * block_flt[i].y,
+            block_flt[i].z * block_flt[i].z,
+        };
+        sq_sum = sq_sum + sq;
     }
+    Vec3f avg = sum / (decimal)(pixel_count);
+    Vec3f var =
+        (sq_sum / pixel_count) - Vec3f { avg.x*avg.x, avg.y*avg.y, avg.z*avg.z };
+    Vec3f std = {
+        std::sqrt(var.x),
+        std::sqrt(var.y),
+        std::sqrt(var.z),
+    };
+
+    // printf("\n");
+    // printf("avg: %5.3f %5.3f %5.3f  std: %5.3f %5.3f %5.3f\n",
+    //     avg.x, avg.y, avg.z, std.x, std.y, std.z);
 
     // Determine line through color space
     Vec3f mincol, maxcol;
     find_minmaxcolor_bbox_astc(block_flt, pixel_count, &mincol, &maxcol);
-    // printf("1 mincol: %5.3f %5.3f %5.3f  maxcol: %5.3f %5.3f %5.3f\n",
-    //     mincol.x, mincol.y, mincol.z, maxcol.x, maxcol.y, maxcol.z);
+    // print_minmax("   ", mincol, maxcol);
 #if ASTC_SELECT_DIAG == 1
     bool swapped = select_diagonal(block_flt, pixel_count, &mincol, &maxcol);
     // if (swapped)
     // {
-    //     printf("2 mincol: %5.3f %5.3f %5.3f  maxcol: %5.3f %5.3f %5.3f\n",
-    //         mincol.x, mincol.y, mincol.z, maxcol.x, maxcol.y, maxcol.z);
+    //     print_minmax("swp", mincol, maxcol);
     // }
 #endif
     inset_bbox(&mincol, &maxcol);
-    // printf("3 mincol: %5.3f %5.3f %5.3f  maxcol: %5.3f %5.3f %5.3f\n",
-    //     mincol.x, mincol.y, mincol.z, maxcol.x, maxcol.y, maxcol.z);
+    // print_minmax("ins", mincol, maxcol);
 
     // Quantize endpoints
     Vec3i mincol_int = quantize_5b(&mincol);
     Vec3i maxcol_int = quantize_5b(&maxcol);
-    // printf("4 mincol: %5.3f %5.3f %5.3f  maxcol: %5.3f %5.3f %5.3f\n",
-    //     mincol.x, mincol.y, mincol.z, maxcol.x, maxcol.y, maxcol.z);
+    // print_minmax("qnt", mincol, maxcol);
     // uint8_t maxcol_int[3] = {
     //     quantize_5b(&maxcol.x),
     //     quantize_5b(&maxcol.y),
@@ -296,10 +337,15 @@ void encode_block_astc(
         Vec3f tmpf = mincol;
         mincol = maxcol;
         maxcol = tmpf;
-        // printf("5 mincol: %5.3f %5.3f %5.3f  maxcol: %5.3f %5.3f %5.3f\n",
-        //     mincol.x, mincol.y, mincol.z, maxcol.x, maxcol.y, maxcol.z);
+        // print_minmax("swp", mincol, maxcol);
     }
 #endif
+    // printf("int mincol:                    %3d %3d %3d\n",
+    //     mincol_int.x, mincol_int.y, mincol_int.z
+    // );
+    // printf("int maxcol:                    %3d %3d %3d\n",
+    //     maxcol_int.x, maxcol_int.y, maxcol_int.z
+    // );
 
     // Move the endpoints line segment such that mincol is at zero
     Vec3f ep_vec = maxcol - mincol;
@@ -342,7 +388,7 @@ void encode_block_astc(
     uint8_t quantized_weights[MAX_PIXEL_COUNT];
     for (int i = 0; i < wgt_count; ++i)
     {
-        quantized_weights[i] = quantize_2b(downsampled_weights[i]) >> 6;
+        quantized_weights[i] = quantize_2b(downsampled_weights[i]);
     }
 
     // Output buffers for quantized weights and output data
@@ -377,12 +423,12 @@ void encode_block_astc(
 
     // Quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
     uint8_t endpoints_q[6] = {
-        (uint8_t)(mincol_int.x >> 3),
-        (uint8_t)(maxcol_int.x >> 3),
-        (uint8_t)(mincol_int.y >> 3),
-        (uint8_t)(maxcol_int.y >> 3),
-        (uint8_t)(mincol_int.z >> 3),
-        (uint8_t)(maxcol_int.z >> 3),
+        (uint8_t)(mincol_int.x),
+        (uint8_t)(maxcol_int.x),
+        (uint8_t)(mincol_int.y),
+        (uint8_t)(maxcol_int.y),
+        (uint8_t)(mincol_int.z),
+        (uint8_t)(maxcol_int.z),
     };
     // for (int i = 0; i < 3; ++i)
     // {
@@ -435,17 +481,17 @@ void encode_block_astc(
             printf("\n");
         }
     }
-
-    printf("Quantized weights:\n");
-    for (int i = 0; i < wgt_count; ++i)
-    {
-        printf("%4d" , quantized_weights[i]);
-        if ((i % wgt_grid_w) == (wgt_grid_w - 1))
-        {
-            printf("\n");
-        }
-    }
-
+// #endif
+//     printf("Quantized weights:\n");
+//     for (int i = 0; i < wgt_count; ++i)
+//     {
+//         printf("%4d" , quantized_weights[i]);
+//         if ((i % wgt_grid_w) == (wgt_grid_w - 1))
+//         {
+//             printf("\n");
+//         }
+//     }
+// #if 0
     if ( (mincol_int[0] + mincol_int[1] + mincol_int[2])
         > (maxcol_int[0] + maxcol_int[1] + maxcol_int[2]) )
     {

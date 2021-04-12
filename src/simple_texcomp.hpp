@@ -31,8 +31,11 @@ const decimal EPSILON = 1e-6;
 
 /* Maximum input block size */
 #define ASTC_MAX_BLOCK_DIM 12
-/* Maximum dimension of the weight grid stored in an ASTC block */
-#define ASTC_MAX_GRID_DIM  10
+/* Maximum dimension of the weight grid stored in an ASTC block
+ *
+ * 12x12 weights do not fit into a block but there could be e.g. 12x4
+ */
+#define ASTC_MAX_GRID_DIM  12
 
 /* Optional refinement (can improve quality at small runtime cost)
  * 1 - enable, 0 - disable
