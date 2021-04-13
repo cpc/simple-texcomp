@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdio>
 #include <cmath>
 
@@ -149,6 +150,7 @@ void bilinear_downsample(
             }
             // the weights do not sum up to 1 => we need to normalize
             out_pixel /= weight_sum;
+            assert(!std::isnan(out_pixel));
             tmp[y*w_out+m] = out_pixel;
         }
     }
@@ -171,6 +173,7 @@ void bilinear_downsample(
             }
             // the weights do not sum up to 1 => we need to normalize
             out_pixel /= weight_sum;
+            assert(!std::isnan(out_pixel));
             out[n*w_out+m] = out_pixel;
         }
     }
