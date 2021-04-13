@@ -137,7 +137,7 @@ void bilinear_downsample(
         for (int m = 0; m < w_out; ++m)
         {
             uint8_t pixel_count = bw->bilin_pixel_count_x[m];
-            decimal weight_sum = 1e-11;  // prevent division by 0
+            decimal weight_sum = std::numeric_limits<decimal>::min();  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t x = 0; x < pixel_count; ++x)
             {
@@ -159,7 +159,7 @@ void bilinear_downsample(
         for (int n = 0; n < h_out; ++n)
         {
             uint8_t pixel_count = bw->bilin_pixel_count_y[n];
-            decimal weight_sum = 1e-11;  // prevent division by 0
+            decimal weight_sum = std::numeric_limits<decimal>::min();  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t y = 0; y < pixel_count; ++y)
             {
