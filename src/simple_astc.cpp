@@ -420,11 +420,6 @@ void encode_block_astc(
     Vec3i mincol_int = quantize_5b(&mincol);
     Vec3i maxcol_int = quantize_5b(&maxcol);
     // print_minmax("qnt", mincol, maxcol);
-    // uint8_t maxcol_int[3] = {
-    //     quantize_5b(&maxcol.x),
-    //     quantize_5b(&maxcol.y),
-    //     quantize_5b(&maxcol.z)
-    // };
 
 #if ASTC_SELECT_DIAG == 1
     if ( (mincol_int.x + mincol_int.y + mincol_int.z)
@@ -535,11 +530,6 @@ void encode_block_astc(
         (uint8_t)(mincol_int.z),
         (uint8_t)(maxcol_int.z),
     };
-    // for (int i = 0; i < 3; ++i)
-    // {
-    //     endpoints_q[2*i] = mincol_int[i] >> 3;
-    //     endpoints_q[2*i+1] = maxcol_int[i] >> 3;
-    // }
 
     // write out endpoints
     off = 17;  // starting bit position for endpoints data
@@ -586,17 +576,17 @@ void encode_block_astc(
             printf("\n");
         }
     }
-// #endif
-//     printf("Quantized weights:\n");
-//     for (int i = 0; i < wgt_count; ++i)
-//     {
-//         printf("%4d" , quantized_weights[i]);
-//         if ((i % wgt_grid_w) == (wgt_grid_w - 1))
-//         {
-//             printf("\n");
-//         }
-//     }
-// #if 0
+
+    printf("Quantized weights:\n");
+    for (int i = 0; i < wgt_count; ++i)
+    {
+        printf("%4d" , quantized_weights[i]);
+        if ((i % wgt_grid_w) == (wgt_grid_w - 1))
+        {
+            printf("\n");
+        }
+    }
+
     if ( (mincol_int[0] + mincol_int[1] + mincol_int[2])
         > (maxcol_int[0] + maxcol_int[1] + maxcol_int[2]) )
     {
