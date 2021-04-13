@@ -8,6 +8,7 @@ project(
     'cpp_std=c++17', # due to std::filesystem, otherwise could be lower
     'buildtype=debugoptimized',
     'warning_level=3',
+    'b_ndebug=if-release',
   ]
 )
 
@@ -15,12 +16,6 @@ add_project_arguments(
   ['-Wdouble-promotion', '-Wfloat-conversion', '-Wnarrowing'],
   language: 'cpp'
 )
-
-if get_option('buildtype') == 'release'
-  add_project_arguments('-DNDEBUG', language: 'cpp')
-else
-  add_project_arguments('-DDEBUG', language: 'cpp')
-endif
 
 if get_option('bc1_sel')
   add_project_arguments('-DBC1_SELECT_DIAG=1', language: 'cpp')

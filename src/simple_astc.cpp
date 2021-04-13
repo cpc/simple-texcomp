@@ -365,35 +365,39 @@ void encode_block_astc(
 
     // Convert the block into floating point
     Vec3f block_flt[MAX_PIXEL_COUNT];
-    Vec3f sum = { F(0.0), F(0.0), F(0.0) };
-    Vec3f sq_sum = { F(0.0), F(0.0), F(0.0) };
     // TODO: this loop can be merged with find_minmaxcolor_bbox_astc()
     for (int i = 0; i < pixel_count; ++i)
     {
         block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / F(255.0);
         block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / F(255.0);
         block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / F(255.0);
-
-        sum = sum + block_flt[i];
-        Vec3f sq = {
-            block_flt[i].x * block_flt[i].x,
-            block_flt[i].y * block_flt[i].y,
-            block_flt[i].z * block_flt[i].z,
-        };
-        sq_sum = sq_sum + sq;
     }
-    Vec3f avg = sum / (decimal)(pixel_count);
-    Vec3f var =
-        (sq_sum / pixel_count) - Vec3f { avg.x*avg.x, avg.y*avg.y, avg.z*avg.z };
-    Vec3f std = {
-        std::sqrt(var.x),
-        std::sqrt(var.y),
-        std::sqrt(var.z),
-    };
+
+    // Vec3f sum = { F(0.0), F(0.0), F(0.0) };
+    // Vec3f sq_sum = { F(0.0), F(0.0), F(0.0) };
+    // for (int i = 0; i < pixel_count; ++i)
+    // {
+    //     sum = sum + block_flt[i];
+    //     Vec3f sq = {
+    //         block_flt[i].x * block_flt[i].x,
+    //         block_flt[i].y * block_flt[i].y,
+    //         block_flt[i].z * block_flt[i].z,
+    //     };
+    //     sq_sum = sq_sum + sq;
+    // }
+    // Vec3f avg = sum / (decimal)(pixel_count);
+    // Vec3f var =
+    //     (sq_sum / pixel_count) - Vec3f { avg.x*avg.x, avg.y*avg.y, avg.z*avg.z };
+    // Vec3f std = {
+    //     std::sqrt(var.x),
+    //     std::sqrt(var.y),
+    //     std::sqrt(var.z),
+    // };
 
     // printf("\n");
     // printf("avg: %5.3f %5.3f %5.3f  std: %5.3f %5.3f %5.3f\n",
-    //     avg.x, avg.y, avg.z, std.x, std.y, std.z);
+    //     (double)avg.x, (double)avg.y, (double)avg.z,
+    //     (double)std.x, (double)std.y, (double)std.z);
 
     // Determine line through color space
     Vec3f mincol, maxcol;
