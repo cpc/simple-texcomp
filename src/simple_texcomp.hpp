@@ -11,11 +11,13 @@
  * EPSILON is used for comparing floating point numbers
  */
 #if USE_DOUBLE == 1
+#define F(x) (x)     // do not append f to decimal literals
 typedef double decimal;
 const decimal EPSILON = 1e-12;
 #else
+#define F(x) (x##f)  // append f to decimal literals
 typedef float decimal;
-const decimal EPSILON = 1e-6;
+const decimal EPSILON = 1e-6f;
 #endif
 
 /******************************************************************************
@@ -44,6 +46,8 @@ const decimal EPSILON = 1e-6;
 #define ASTC_SELECT_DIAG  1
 #endif
 
+/* Stuff for seamless switching between float and double
+ */
 #if USE_DOUBLE == 1
 typedef double decimal;
 #else

@@ -11,8 +11,8 @@
 #include "simple_texcomp.hpp"
 
 /* Endpoint interpolation constants */
-#define EP_LERP1  1.0 / 3.0
-#define EP_LERP2  2.0 / 3.0
+#define EP_LERP1  F(1.0) / F(3.0)
+#define EP_LERP2  F(2.0) / F(3.0)
 
 /* Helper structs and math */
 struct Vec3f
@@ -68,7 +68,7 @@ struct Vec3f
 
     inline decimal dot(const Vec3f &other) const
     {
-        // return std::fmaf(x, other.x, std::fmaf(y, other.y, fmaf(z, other.z, 0.0)));
+        // return std::fmaf(x, other.x, std::fmaf(y, other.y, fmaf(z, other.z, F(0.0))));
         return (x * other.x) + (y * other.y) + (z * other.z);
     }
 };
@@ -240,8 +240,8 @@ inline void find_minmaxcolor_bbox(
     Vec3f *mincol,
     Vec3f *maxcol
 ){
-    *mincol = { 1.0, 1.0, 1.0 };
-    *maxcol = { 0.0, 0.0, 0.0 };
+    *mincol = { F(1.0), F(1.0), F(1.0) };
+    *maxcol = { F(0.0), F(0.0), F(0.0) };
 
     for (int i = 0; i < 16; ++i)
     {
@@ -262,9 +262,9 @@ inline Vec3f rgb565_to_f32(uint16_t color)
     b = (b << 3) | (b >> 2);
 
     return Vec3f {
-        (decimal)(r) / 255.0,
-        (decimal)(g) / 255.0,
-        (decimal)(b) / 255.0,
+        (decimal)(r) / F(255.0),
+        (decimal)(g) / F(255.0),
+        (decimal)(b) / F(255.0),
     };
 }
 

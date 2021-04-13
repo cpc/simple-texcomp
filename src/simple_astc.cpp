@@ -8,7 +8,7 @@
 /**
  * TODO: Optimize this for different quantizations
  */
-#define INSET_MARGIN  (8.0 / 255.0) / 16.0
+#define INSET_MARGIN  (F(8.0) / F(255.0)) / F(16.0)
 
 /* ============================================================================
 	ASTC compressed file handling
@@ -81,40 +81,40 @@ int store_astc_image(
 // Quantization midpoints for better rounding
 // taken from: https://gist.github.com/castano/c92c7626f288f9e99e158520b14a61cf
 static const decimal quant_midpoints_2b[4] = {
-    0.16666667, 0.50000000, 0.83333333, 1.00000000
+    F(0.16666667), F(0.50000000), F(0.83333333), F(1.00000000)
 };
 
 static const decimal quant_midpoints_3b[8] = {
-    0.07058824, 0.21372549, 0.35686275, 0.50000000, 0.64313725, 0.78627451, 0.92941176, 1.00000000
+    F(0.07058824), F(0.21372549), F(0.35686275), F(0.50000000), F(0.64313725), F(0.78627451), F(0.92941176), F(1.00000000)
 };
 
 static const decimal quant_midpoints_5b[32] = {
-    0.01568627, 0.04705882, 0.07843137, 0.11176471, 0.14509804, 0.17647059, 0.20784314, 0.24117647,
-    0.27450980, 0.30588235, 0.33725490, 0.37058824, 0.40392157, 0.43529412, 0.46666667, 0.50000000,
-    0.53333333, 0.56470588, 0.59607843, 0.62941176, 0.66274510, 0.69411765, 0.72549020, 0.75882353,
-    0.79215686, 0.82352941, 0.85490196, 0.88823529, 0.92156863, 0.95294118, 0.98431373, 1.00000000
+    F(0.01568627), F(0.04705882), F(0.07843137), F(0.11176471), F(0.14509804), F(0.17647059), F(0.20784314), F(0.24117647),
+    F(0.27450980), F(0.30588235), F(0.33725490), F(0.37058824), F(0.40392157), F(0.43529412), F(0.46666667), F(0.50000000),
+    F(0.53333333), F(0.56470588), F(0.59607843), F(0.62941176), F(0.66274510), F(0.69411765), F(0.72549020), F(0.75882353),
+    F(0.79215686), F(0.82352941), F(0.85490196), F(0.88823529), F(0.92156863), F(0.95294118), F(0.98431373), F(1.00000000)
 };
 
 // calculate the tables above
 void init_tables() {
     for (int i = 0; i < 3; i++) {
-        decimal f0 = decimal(((i+0) << 6) | ((i+0) << 4) | ((i+0) << 2) | (i+0)) / 255.0;
-        decimal f1 = decimal(((i+1) << 6) | ((i+1) << 4) | ((i+1) << 2) | (i+1)) / 255.0;
-        printf("%.8f, ", (f0 + f1) * 0.5);
+        decimal f0 = decimal(((i+0) << 6) | ((i+0) << 4) | ((i+0) << 2) | (i+0)) / F(255.0);
+        decimal f1 = decimal(((i+1) << 6) | ((i+1) << 4) | ((i+1) << 2) | (i+1)) / F(255.0);
+        printf("%.8f, ", (double)((f0 + f1) * F(0.5)));
     }
-    printf("%.8f\n\n", 1.0);
+    printf("%.8f\n\n", F(1.0));
 
     for (int i = 0; i < 7; i++) {
-        decimal f0 = decimal(((i+0) << 5) | ((i+0) << 2) | ((i+0) >> 1)) / 255.0;
-        decimal f1 = decimal(((i+1) << 5) | ((i+1) << 2) | ((i+1) >> 1)) / 255.0;
-        printf("%.8f, ", (f0 + f1) * 0.5);
+        decimal f0 = decimal(((i+0) << 5) | ((i+0) << 2) | ((i+0) >> 1)) / F(255.0);
+        decimal f1 = decimal(((i+1) << 5) | ((i+1) << 2) | ((i+1) >> 1)) / F(255.0);
+        printf("%.8f, ", (double)((f0 + f1) * F(0.5)));
     }
     printf("%.8f\n\n", 1.0);
 
     for (int i = 0; i < 31; i++) {
-        decimal f0 = decimal(((i+0) << 3) | ((i+0) >> 2)) / 255.0;
-        decimal f1 = decimal(((i+1) << 3) | ((i+1) >> 2)) / 255.0;
-        printf("%.8f, ", (f0 + f1) * 0.5);
+        decimal f0 = decimal(((i+0) << 3) | ((i+0) >> 2)) / F(255.0);
+        decimal f1 = decimal(((i+1) << 3) | ((i+1) >> 2)) / F(255.0);
+        printf("%.8f, ", (double)((f0 + f1) * F(0.5)));
         if ((i % 8) == 7) {
             printf("\n");
         }
@@ -184,17 +184,17 @@ static void print_bin(unsigned int num, unsigned int nb)
 
 static void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
 {
-    Vec3f mincol2 = mincol * 255.0;
-    Vec3f maxcol2 = maxcol * 255.0;
+    Vec3f mincol2 = mincol * F(255.0);
+    Vec3f maxcol2 = maxcol * F(255.0);
 
     printf("%s mincol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
         pre,
-        mincol.x, mincol.y, mincol.z,
-        mincol2.x, mincol2.y, mincol2.z
+        (double)mincol.x, (double)mincol.y, (double)mincol.z,
+        (double)mincol2.x, (double)mincol2.y, (double)mincol2.z
     );
     printf("    maxcol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
-        maxcol.x, maxcol.y, maxcol.z,
-        maxcol2.x, maxcol2.y, maxcol2.z
+        (double)maxcol.x, (double)maxcol.y, (double)maxcol.z,
+        (double)maxcol2.x, (double)maxcol2.y, (double)maxcol2.z
     );
 }
 
@@ -205,17 +205,17 @@ static void find_minmaxcolor_bbox_astc(
     Vec3f *mincol,
     Vec3f *maxcol
 ){
-    *mincol = { 1.0, 1.0, 1.0 };
-    *maxcol = { 0.0, 0.0, 0.0 };
+    *mincol = { F(1.0), F(1.0), F(1.0) };
+    *maxcol = { F(0.0), F(0.0), F(0.0) };
 
     for (int i = 0; i < pixel_count; ++i)
     {
         assert(!std::isnan(block[i].x));
         assert(!std::isnan(block[i].y));
         assert(!std::isnan(block[i].z));
-        assert((block[i].x >= 0.0) && (block[i].x <= 1.0));
-        assert((block[i].y >= 0.0) && (block[i].y <= 1.0));
-        assert((block[i].z >= 0.0) && (block[i].z <= 1.0));
+        assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
+        assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
+        assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
 
         *mincol = min3f(*mincol, block[i]);
         *maxcol = max3f(*maxcol, block[i]);
@@ -225,9 +225,9 @@ static void find_minmaxcolor_bbox_astc(
 /* Shrink the bounding box */
 static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 {
-    Vec3f inset = (*maxcol - *mincol) * (1.0 / 16.0) - INSET_MARGIN;
-    *mincol = clamp3f(*mincol + inset, 0.0, 1.0);
-    *maxcol = clamp3f(*maxcol - inset, 0.0, 1.0);
+    Vec3f inset = (*maxcol - *mincol) * (F(1.0) / F(16.0)) - INSET_MARGIN;
+    *mincol = clamp3f(*mincol + inset, F(0.0), F(1.0));
+    *maxcol = clamp3f(*maxcol - inset, F(0.0), F(1.0));
 }
 
 #if ASTC_SELECT_DIAG == 1
@@ -241,9 +241,9 @@ static inline bool select_diagonal(
     Vec3f *maxcol
 ){
     bool swapped = false;
-    Vec3f center = (*mincol + *maxcol) * 0.5;
+    Vec3f center = (*mincol + *maxcol) * F(0.5);
 
-    Vec2f cov = { 0.0, 0.0 };
+    Vec2f cov = { F(0.0), F(0.0) };
     for (int i = 0; i < pixel_count; ++i) {
         Vec3f t = block[i] - center;
         cov.x += t.x * t.z;
@@ -252,14 +252,14 @@ static inline bool select_diagonal(
 
     // printf("    cov_x: %.5f  cov_y: %.5f\n", cov.x, cov.y);
 
-    if (cov.x < 0.0) {
+    if (cov.x < F(0.0)) {
         decimal tmp = maxcol->x;
         maxcol->x = mincol->x;
         mincol->x = tmp;
         swapped = true;
     }
 
-    if (cov.y < 0.0) {
+    if (cov.y < F(0.0)) {
         decimal tmp = maxcol->y;
         maxcol->y = mincol->y;
         mincol->y = tmp;
@@ -277,17 +277,17 @@ static inline bool select_diagonal(
  */
 static inline uint8_t quantize_2b(decimal x)
 {
-    assert((x >= 0.0) && (x <= 1.0));
+    assert((x >= F(0.0)) && (x <= F(1.0)));
     assert(!std::isnan(x));
 
     // There is a couple of ways to do this. The correct one would be:
     //
-    // uint8_t quant = (uint8_t)(x * 3.0);
+    // uint8_t quant = (uint8_t)(x * F(3.0));
     // quant += (x > quant_midpoints_2b[quant]);
     //
     // or without ideal rounding (about 0.0016 dB loss):
     //
-    // uint8_t quant = u8clamp((uint8_t)(x * 3.0 + 0.5), 0, 3);
+    // uint8_t quant = u8clamp((uint8_t)(x * F(3.0) + F(0.5)), 0, 3);
     //
     // However, I found that for some reason, quantizing first to 3 bits, then
     // bit-shifting to 2 bits yealds better quality.
@@ -295,7 +295,7 @@ static inline uint8_t quantize_2b(decimal x)
     // performed after the first rounding (see the +0.5), otherwise has no
     // effect.
 
-    uint8_t quant = u8clamp((uint8_t)(x * 7.0 + 0.5), 0, 7);
+    uint8_t quant = u8clamp((uint8_t)(x * F(7.0) + F(0.5)), 0, 7);
     quant += (x > quant_midpoints_3b[quant]);
     quant >>= 1;
 
@@ -313,17 +313,17 @@ static inline Vec3i quantize_5b(Vec3f *vec)
     assert(!std::isnan(vec->x));
     assert(!std::isnan(vec->y));
     assert(!std::isnan(vec->z));
-    assert((vec->x >= 0.0) && (vec->x <= 1.0));
-    assert((vec->y >= 0.0) && (vec->y <= 1.0));
-    assert((vec->z >= 0.0) && (vec->z <= 1.0));
+    assert((vec->x >= F(0.0)) && (vec->x <= F(1.0)));
+    assert((vec->y >= F(0.0)) && (vec->y <= F(1.0)));
+    assert((vec->z >= F(0.0)) && (vec->z <= F(1.0)));
 
     // Ideal rounding yields about 0.002 dB improvement. Otherwise, non-ideal
     // rounding:
-    // int quant_x = iclamp((int)(vec->x * 31.0 + 0.5), 0, 31);
+    // int quant_x = iclamp((int)(vec->x * F(31.0) + F(0.5)), 0, 31);
 
-    int quant_x = (int)(vec->x * 31.0);
-    int quant_y = (int)(vec->y * 31.0);
-    int quant_z = (int)(vec->z * 31.0);
+    int quant_x = (int)(vec->x * F(31.0));
+    int quant_y = (int)(vec->y * F(31.0));
+    int quant_z = (int)(vec->z * F(31.0));
 
     quant_x += (vec->x > quant_midpoints_5b[quant_x]);
     quant_y += (vec->y > quant_midpoints_5b[quant_y]);
@@ -333,13 +333,13 @@ static inline Vec3i quantize_5b(Vec3f *vec)
     int dequant_y = (quant_y << 3) | (quant_y >> 2);
     int dequant_z = (quant_z << 3) | (quant_z >> 2);
 
-    vec->x = (decimal)(dequant_x) * (1.0 / 255.0);
-    vec->y = (decimal)(dequant_y) * (1.0 / 255.0);
-    vec->z = (decimal)(dequant_z) * (1.0 / 255.0);
+    vec->x = (decimal)(dequant_x) * (F(1.0) / F(255.0));
+    vec->y = (decimal)(dequant_y) * (F(1.0) / F(255.0));
+    vec->z = (decimal)(dequant_z) * (F(1.0) / F(255.0));
 
-    assert((vec->x >= 0.0) && (vec->x <= 1.0));
-    assert((vec->y >= 0.0) && (vec->y <= 1.0));
-    assert((vec->z >= 0.0) && (vec->z <= 1.0));
+    assert((vec->x >= F(0.0)) && (vec->x <= F(1.0)));
+    assert((vec->y >= F(0.0)) && (vec->y <= F(1.0)));
+    assert((vec->z >= F(0.0)) && (vec->z <= F(1.0)));
     return Vec3i { quant_x, quant_y, quant_z };
 }
 
@@ -365,14 +365,14 @@ void encode_block_astc(
 
     // Convert the block into floating point
     Vec3f block_flt[MAX_PIXEL_COUNT];
-    Vec3f sum = { 0.0, 0.0, 0.0 };
-    Vec3f sq_sum = { 0.0, 0.0, 0.0 };
+    Vec3f sum = { F(0.0), F(0.0), F(0.0) };
+    Vec3f sq_sum = { F(0.0), F(0.0), F(0.0) };
     // TODO: this loop can be merged with find_minmaxcolor_bbox_astc()
     for (int i = 0; i < pixel_count; ++i)
     {
-        block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / 255.0;
-        block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / 255.0;
-        block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / 255.0;
+        block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / F(255.0);
+        block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / F(255.0);
+        block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / F(255.0);
 
         sum = sum + block_flt[i];
         Vec3f sq = {
@@ -439,7 +439,7 @@ void encode_block_astc(
     //     maxcol_int.x, maxcol_int.y, maxcol_int.z
     // );
 
-    decimal downsampled_weights[MAX_PIXEL_COUNT] = { 0.0 };
+    decimal downsampled_weights[MAX_PIXEL_COUNT] = { F(0.0) };
 
     // TODO: use void extent to handle constant block
     if (mincol_int != maxcol_int)
@@ -447,12 +447,12 @@ void encode_block_astc(
         // Move the endpoints line segment such that mincol is at zero
         Vec3f ep_vec = maxcol - mincol;
         // Normalize the endpoint vector
-        // decimal norm = 1.0 / std::sqrt(ep_vec.dot(ep_vec));
+        // decimal norm = F(1.0) / std::sqrt(ep_vec.dot(ep_vec));
         // Vec3f ep_vec_norm = ep_vec * norm;
 
         // It works when the norm is squared, why?
         Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
-        assert(ep_vec.dot(ep_vec) != 0.0);
+        assert(ep_vec.dot(ep_vec) != F(0.0));
 
         // Project all pixels onto the endpoint vector. For each pixel, the result
         // tells how far it goes into the endpoint vector direction. Small values
@@ -465,8 +465,8 @@ void encode_block_astc(
         {
             ideal_weights[i] = fclamp(
                 (block_flt[i] - mincol).dot(ep_vec_scaled),
-                0.0,
-                1.0
+                F(0.0),
+                F(1.0)
             );
         }
 

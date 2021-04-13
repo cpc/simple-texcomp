@@ -6,11 +6,11 @@
 
 /*
  * = (8.0/255.0)/16.0 for CoCg and (16.0/255.0)/32.0 for Y */
-#define INSET_MARGIN_Y  (16.0 / 255.0) / 32.0
-#define INSET_MARGIN_COCG  (8.0 / 255.0) / 16.0
+#define INSET_MARGIN_Y  (F(16.0) / F(255.0)) / F(32.0)
+#define INSET_MARGIN_COCG  (F(8.0) / F(255.0)) / F(16.0)
 
 /* Offset to center color value at grey level (= 128.0/255.0) */
-#define OFFSET  128.0 / 255.0
+#define OFFSET  F(128.0) / F(255.0)
 
 /* Helper type for easier access of 16b and 32b words inside a 64b block
  *
@@ -28,25 +28,25 @@ union bc_block_t
 static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
 {
     return Vec3f {
-        rgb.dot(Vec3f {  0.25, 0.50,  0.25 }),
-        rgb.dot(Vec3f {  0.50, 0.00, -0.50 }) + OFFSET,
-        rgb.dot(Vec3f { -0.25, 0.50, -0.25 }) + OFFSET,
+        rgb.dot(Vec3f {  F(0.25), F(0.50),  F(0.25) }),
+        rgb.dot(Vec3f {  F(0.50), F(0.00), -F(0.50) }) + OFFSET,
+        rgb.dot(Vec3f { -F(0.25), F(0.50), -F(0.25) }) + OFFSET,
     };
 }
 
 /* Convert a f32 2-channel color into RG channels and scale into B channel */
 static inline uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
 {
-    uint32_t r = (uint32_t)round(color->x * 31.0);
-    uint32_t g = (uint32_t)round(color->y * 63.0);
+    uint32_t r = (uint32_t)round(color->x * F(31.0));
+    uint32_t g = (uint32_t)round(color->y * F(63.0));
 
     uint32_t out = (r << 11) | (g << 5) | (scale - 1);
 
     r = (r << 3) | (r >> 2);
     g = (g << 2) | (g >> 4);
 
-    color->x = (decimal)(r) * (1.0 / 255.0);
-    color->y = (decimal)(g) * (1.0 / 255.0);
+    color->x = (decimal)(r) * (F(1.0) / F(255.0));
+    color->y = (decimal)(g) * (F(1.0) / F(255.0));
 
     return out;
 }
@@ -57,9 +57,9 @@ static inline void select_cocg_diagonal(
     Vec2f *min_cocg,
     Vec2f *max_cocg
 ){
-    Vec2f center = (*min_cocg + *max_cocg) * 0.5;
+    Vec2f center = (*min_cocg + *max_cocg) * F(0.5);
 
-    decimal cov = 0.0;
+    decimal cov = F(0.0);
     for (int i = 0; i < 16; ++i) {
         Vec2f t = {
             block[i].y - center.x,
@@ -85,8 +85,8 @@ static inline uint32_t get_cocg_scale(
 
     decimal m = (decimal)fmax(fmax(m0.x, m0.y), fmax(m1.x, m1.y));
 
-    const decimal s0 = 64.0 / 255.0;
-    const decimal s1 = 32.0 / 255.0;
+    const decimal s0 = F(64.0) / F(255.0);
+    const decimal s1 = F(32.0) / F(255.0);
 
     uint32_t scale = 1;
     if (m < s0) {
@@ -104,9 +104,9 @@ void inset_bbox_cocg(
     Vec2f *min_cocg,
     Vec2f *max_cocg
 ){
-    Vec2f inset = (*max_cocg - *min_cocg) * (1.0 / 16.0) - INSET_MARGIN_COCG;
-    *min_cocg = clamp2f(*min_cocg + inset, 0.0, 1.0);
-    *max_cocg = clamp2f(*max_cocg - inset, 0.0, 1.0);
+    Vec2f inset = (*max_cocg - *min_cocg) * (F(1.0) / F(16.0)) - INSET_MARGIN_COCG;
+    *min_cocg = clamp2f(*min_cocg + inset, F(0.0), F(1.0));
+    *max_cocg = clamp2f(*max_cocg - inset, F(0.0), F(1.0));
 }
 
 /* Write endpoints to the BC1 block */
@@ -185,9 +185,9 @@ void inset_bbox_y(
     decimal *min_y,
     decimal *max_y
 ){
-    decimal inset = (*max_y - *min_y) / 32.0 - INSET_MARGIN_Y;
-    *min_y = fclamp(*min_y + inset, 0.0, 1.0);
-    *max_y = fclamp(*max_y - inset, 0.0, 1.0);
+    decimal inset = (*max_y - *min_y) / F(32.0) - INSET_MARGIN_Y;
+    *min_y = fclamp(*min_y + inset, F(0.0), F(1.0));
+    *max_y = fclamp(*max_y - inset, F(0.0), F(1.0));
 }
 
 /* Write Y endpoints into the BC4 block, each 8 bits */
@@ -198,8 +198,8 @@ void emit_endpoints_y(
 ){
     inset_bbox_y(min_y, max_y);
 
-    out_block->b8[0] = (uint8_t)(round(*max_y * 255.0));
-    out_block->b8[1] = (uint8_t)(round(*min_y * 255.0));
+    out_block->b8[0] = (uint8_t)(round(*max_y * F(255.0)));
+    out_block->b8[1] = (uint8_t)(round(*min_y * F(255.0)));
 }
 
 /* Write 3-bit Y indices into the rest of the BC4 block */
@@ -209,15 +209,15 @@ void emit_indices_y(
     const decimal &max_y,
     bc_block_t *out_block
 ){
-    decimal mid = (max_y - min_y) / (2.0 * 7);
+    decimal mid = (max_y - min_y) / (F(2.0) * F(7.0));
 
     decimal ab1 = min_y + mid;
-    decimal ab2 = (6.0 * max_y + 1.0 * min_y) * (1.0 / 7) + mid;
-    decimal ab3 = (5.0 * max_y + 2.0 * min_y) * (1.0 / 7) + mid;
-    decimal ab4 = (4.0 * max_y + 3.0 * min_y) * (1.0 / 7) + mid;
-    decimal ab5 = (3.0 * max_y + 4.0 * min_y) * (1.0 / 7) + mid;
-    decimal ab6 = (2.0 * max_y + 5.0 * min_y) * (1.0 / 7) + mid;
-    decimal ab7 = (1.0 * max_y + 6.0 * min_y) * (1.0 / 7) + mid;
+    decimal ab2 = (F(6.0) * max_y + F(1.0) * min_y) * (F(1.0) / F(7.0)) + mid;
+    decimal ab3 = (F(5.0) * max_y + F(2.0) * min_y) * (F(1.0) / F(7.0)) + mid;
+    decimal ab4 = (F(4.0) * max_y + F(3.0) * min_y) * (F(1.0) / F(7.0)) + mid;
+    decimal ab5 = (F(3.0) * max_y + F(4.0) * min_y) * (F(1.0) / F(7.0)) + mid;
+    decimal ab6 = (F(2.0) * max_y + F(5.0) * min_y) * (F(1.0) / F(7.0)) + mid;
+    decimal ab7 = (F(1.0) * max_y + F(6.0) * min_y) * (F(1.0) / F(7.0)) + mid;
 
     bc_block_t indices;
     indices.b64 = 0;
@@ -253,9 +253,9 @@ void encode_block_ycocg_bc3(
     {
         block32f_ycocg[i] = rgb_to_ycocg(
             Vec3f {
-                (decimal)block_pixels[NCH_RGB*i] / 255.0,
-                (decimal)block_pixels[NCH_RGB*i+1] / 255.0,
-                (decimal)block_pixels[NCH_RGB*i+2] / 255.0,
+                (decimal)block_pixels[NCH_RGB*i] / F(255.0),
+                (decimal)block_pixels[NCH_RGB*i+1] / F(255.0),
+                (decimal)block_pixels[NCH_RGB*i+2] / F(255.0),
             }
         );
     }
@@ -299,17 +299,17 @@ void decode_block_ycocg_bc3(
         .b32 = { enc_block[0], enc_block[1] }
     };
 
-    decimal max_y = (decimal)block_y.b8[0] / 255.0;
-    decimal min_y = (decimal)block_y.b8[1] / 255.0;
+    decimal max_y = (decimal)block_y.b8[0] / F(255.0);
+    decimal min_y = (decimal)block_y.b8[1] / F(255.0);
     decimal palette_y[8];
     palette_y[0] = max_y;
     palette_y[1] = min_y;
-    palette_y[2] = (6.0 * max_y + 1.0 * min_y) * (1.0 / 7.0);
-    palette_y[3] = (5.0 * max_y + 2.0 * min_y) * (1.0 / 7.0);
-    palette_y[4] = (4.0 * max_y + 3.0 * min_y) * (1.0 / 7.0);
-    palette_y[5] = (3.0 * max_y + 4.0 * min_y) * (1.0 / 7.0);
-    palette_y[6] = (2.0 * max_y + 5.0 * min_y) * (1.0 / 7.0);
-    palette_y[7] = (1.0 * max_y + 6.0 * min_y) * (1.0 / 7.0);
+    palette_y[2] = (F(6.0) * max_y + F(1.0) * min_y) * (F(1.0) / F(7.0));
+    palette_y[3] = (F(5.0) * max_y + F(2.0) * min_y) * (F(1.0) / F(7.0));
+    palette_y[4] = (F(4.0) * max_y + F(3.0) * min_y) * (F(1.0) / F(7.0));
+    palette_y[5] = (F(3.0) * max_y + F(4.0) * min_y) * (F(1.0) / F(7.0));
+    palette_y[6] = (F(2.0) * max_y + F(5.0) * min_y) * (F(1.0) / F(7.0));
+    palette_y[7] = (F(1.0) * max_y + F(6.0) * min_y) * (F(1.0) / F(7.0));
 
     // Read CoCg palette
     bc_block_t block_cocg = {
@@ -330,7 +330,7 @@ void decode_block_ycocg_bc3(
         int id_cocg = ( block_cocg.b32[1] >> (2*i) ) & 0x3;
         Vec3f cocgscale = palette_cocgscale[id_cocg];
 
-        decimal inv_scale = 1.0 / ((255.0 / 8.0) * cocgscale.z + 1.0);
+        decimal inv_scale = F(1.0) / ((F(255.0) / F(8.0)) * cocgscale.z + F(1.0));
         decimal co = (cocgscale.x - OFFSET) * inv_scale;
         decimal cg = (cocgscale.y - OFFSET) * inv_scale;
 
@@ -341,12 +341,12 @@ void decode_block_ycocg_bc3(
 		// decimal g = y + cg;
 		// decimal b = y - co - cg;
 
-		decimal r = fclamp(y + co - cg, 0.0, 1.0);
-		decimal g = fclamp(y + cg, 0.0, 1.0);
-		decimal b = fclamp(y - co - cg, 0.0, 1.0);
+		decimal r = fclamp(y + co - cg, F(0.0), F(1.0));
+		decimal g = fclamp(y + cg, F(0.0), F(1.0));
+		decimal b = fclamp(y - co - cg, F(0.0), F(1.0));
 
-        out_pixels[NCH_RGB*i] = (uint8_t)(r * 255.0);
-        out_pixels[NCH_RGB*i+1] = (uint8_t)(g * 255.0);
-        out_pixels[NCH_RGB*i+2] = (uint8_t)(b * 255.0);
+        out_pixels[NCH_RGB*i] = (uint8_t)(r * F(255.0));
+        out_pixels[NCH_RGB*i+1] = (uint8_t)(g * F(255.0));
+        out_pixels[NCH_RGB*i+2] = (uint8_t)(b * F(255.0));
     }
 }

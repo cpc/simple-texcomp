@@ -31,13 +31,6 @@ endif
 if get_option('use_double')
   add_project_arguments('-DUSE_DOUBLE=1', language: 'cpp')
 else
-  if meson.get_compiler('cpp').get_id() != 'gcc'
-    error('Floating point only works correctly with GNU compiler.')
-  endif
-  add_project_arguments(
-    '-fsingle-precision-constant',
-    language: 'cpp'
-  )
   add_project_arguments('-DUSE_DOUBLE=0', language: 'cpp')
 endif
 
