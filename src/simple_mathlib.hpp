@@ -137,11 +137,38 @@ struct Vec3i
     int x;
     int y;
     int z;
+
+    inline Vec3i operator>>(unsigned int nbits) const
+    {
+        return Vec3i {
+            x >> nbits,
+            y >> nbits,
+            z >> nbits,
+        };
+    }
+
+    inline bool operator!=(const Vec3i &other) const
+    {
+        return !( (x == other.x) && (y == other.y) && (z == other.z) );
+    }
+
 };
 
 inline decimal fclamp(decimal a, decimal amin, decimal amax)
 {
     const decimal min = a < amin ? amin : a;
+    return min > amax ? amax : min;
+}
+
+inline int iclamp(int a, int amin, int amax)
+{
+    const int min = a < amin ? amin : a;
+    return min > amax ? amax : min;
+}
+
+inline uint8_t u8clamp(uint8_t a, uint8_t amin, uint8_t amax)
+{
+    const uint8_t min = a < amin ? amin : a;
     return min > amax ? amax : min;
 }
 
@@ -169,6 +196,15 @@ inline Vec3f clamp3f(const Vec3f &a, decimal amin, decimal amax)
         fclamp(a.x, amin, amax),
         fclamp(a.y, amin, amax),
         fclamp(a.z, amin, amax),
+    };
+}
+
+inline Vec3i clamp3i(const Vec3i &a, int amin, int amax)
+{
+    return Vec3i {
+        iclamp(a.x, amin, amax),
+        iclamp(a.y, amin, amax),
+        iclamp(a.z, amin, amax),
     };
 }
 

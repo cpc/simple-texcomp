@@ -16,6 +16,12 @@ add_project_arguments(
   language: 'cpp'
 )
 
+if get_option('buildtype') == 'release'
+  add_project_arguments('-DNDEBUG', language: 'cpp')
+else
+  add_project_arguments('-DDEBUG', language: 'cpp')
+endif
+
 if get_option('bc1_sel')
   add_project_arguments('-DBC1_SELECT_DIAG=1', language: 'cpp')
 else

@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cassert>
 #include <fstream>
 
 #include "simple_mathlib.hpp"
@@ -77,6 +78,50 @@ int store_astc_image(
 
 /* ========================================================================= */
 
+// Quantization midpoints for better rounding
+// taken from: https://gist.github.com/castano/c92c7626f288f9e99e158520b14a61cf
+static const decimal quant_midpoints_2b[4] = {
+    0.16666667, 0.50000000, 0.83333333, 1.00000000
+};
+
+static const decimal quant_midpoints_3b[8] = {
+    0.07058824, 0.21372549, 0.35686275, 0.50000000, 0.64313725, 0.78627451, 0.92941176, 1.00000000
+};
+
+static const decimal quant_midpoints_5b[32] = {
+    0.01568627, 0.04705882, 0.07843137, 0.11176471, 0.14509804, 0.17647059, 0.20784314, 0.24117647,
+    0.27450980, 0.30588235, 0.33725490, 0.37058824, 0.40392157, 0.43529412, 0.46666667, 0.50000000,
+    0.53333333, 0.56470588, 0.59607843, 0.62941176, 0.66274510, 0.69411765, 0.72549020, 0.75882353,
+    0.79215686, 0.82352941, 0.85490196, 0.88823529, 0.92156863, 0.95294118, 0.98431373, 1.00000000
+};
+
+// calculate the tables above
+void init_tables() {
+    for (int i = 0; i < 3; i++) {
+        decimal f0 = decimal(((i+0) << 6) | ((i+0) << 4) | ((i+0) << 2) | (i+0)) / 255.0;
+        decimal f1 = decimal(((i+1) << 6) | ((i+1) << 4) | ((i+1) << 2) | (i+1)) / 255.0;
+        printf("%.8f, ", (f0 + f1) * 0.5);
+    }
+    printf("%.8f\n\n", 1.0);
+
+    for (int i = 0; i < 7; i++) {
+        decimal f0 = decimal(((i+0) << 5) | ((i+0) << 2) | ((i+0) >> 1)) / 255.0;
+        decimal f1 = decimal(((i+1) << 5) | ((i+1) << 2) | ((i+1) >> 1)) / 255.0;
+        printf("%.8f, ", (f0 + f1) * 0.5);
+    }
+    printf("%.8f\n\n", 1.0);
+
+    for (int i = 0; i < 31; i++) {
+        decimal f0 = decimal(((i+0) << 3) | ((i+0) >> 2)) / 255.0;
+        decimal f1 = decimal(((i+1) << 3) | ((i+1) >> 2)) / 255.0;
+        printf("%.8f, ", (f0 + f1) * 0.5);
+        if ((i % 8) == 7) {
+            printf("\n");
+        }
+    }
+    printf("%.8f\n", 1.0);
+}
+
 /* Pre-computed bilinear filter weights */
 static bilinear_weights bilin_weights;
 
@@ -86,6 +131,7 @@ int init_astc(
     int weight_grid_x,
     int weight_grid_y
 ){
+    // init_tables();
     int ret = populate_bilinear_weights(
         block_size_x,
         block_size_y,
@@ -164,6 +210,13 @@ static void find_minmaxcolor_bbox_astc(
 
     for (int i = 0; i < pixel_count; ++i)
     {
+        assert(!std::isnan(block[i].x));
+        assert(!std::isnan(block[i].y));
+        assert(!std::isnan(block[i].z));
+        assert((block[i].x >= 0.0) && (block[i].x <= 1.0));
+        assert((block[i].y >= 0.0) && (block[i].y <= 1.0));
+        assert((block[i].z >= 0.0) && (block[i].z <= 1.0));
+
         *mincol = min3f(*mincol, block[i]);
         *maxcol = max3f(*maxcol, block[i]);
     }
@@ -224,8 +277,30 @@ static inline bool select_diagonal(
  */
 static inline uint8_t quantize_2b(decimal x)
 {
-    // TODO: make round (+ 0.5)
-    return (uint8_t)round(x * 3.0);
+    assert((x >= 0.0) && (x <= 1.0));
+    assert(!std::isnan(x));
+
+    // There is a couple of ways to do this. The correct one would be:
+    //
+    // uint8_t quant = (uint8_t)(x * 3.0);
+    // quant += (x > quant_midpoints_2b[quant]);
+    //
+    // or without ideal rounding (about 0.0016 dB loss):
+    //
+    // uint8_t quant = u8clamp((uint8_t)(x * 3.0 + 0.5), 0, 3);
+    //
+    // However, I found that for some reason, quantizing first to 3 bits, then
+    // bit-shifting to 2 bits yealds better quality.
+    // The ideal rounding yields about .001 dB improvement, and only when it is
+    // performed after the first rounding (see the +0.5), otherwise has no
+    // effect.
+
+    uint8_t quant = u8clamp((uint8_t)(x * 7.0 + 0.5), 0, 7);
+    quant += (x > quant_midpoints_3b[quant]);
+    quant >>= 1;
+
+    assert((quant >= 0) && (quant <= 3));
+    return quant;
 }
 
 /** Quantize a decimal value into 5 bits (32 values)
@@ -235,10 +310,24 @@ static inline uint8_t quantize_2b(decimal x)
  */
 static inline Vec3i quantize_5b(Vec3f *vec)
 {
-    // TODO: make round (+ 0.5)
-    int quant_x = (int)round(vec->x * 31.0);
-    int quant_y = (int)round(vec->y * 31.0);
-    int quant_z = (int)round(vec->z * 31.0);
+    assert(!std::isnan(vec->x));
+    assert(!std::isnan(vec->y));
+    assert(!std::isnan(vec->z));
+    assert((vec->x >= 0.0) && (vec->x <= 1.0));
+    assert((vec->y >= 0.0) && (vec->y <= 1.0));
+    assert((vec->z >= 0.0) && (vec->z <= 1.0));
+
+    // Ideal rounding yields about 0.002 dB improvement. Otherwise, non-ideal
+    // rounding:
+    // int quant_x = iclamp((int)(vec->x * 31.0 + 0.5), 0, 31);
+
+    int quant_x = (int)(vec->x * 31.0);
+    int quant_y = (int)(vec->y * 31.0);
+    int quant_z = (int)(vec->z * 31.0);
+
+    quant_x += (vec->x > quant_midpoints_5b[quant_x]);
+    quant_y += (vec->y > quant_midpoints_5b[quant_y]);
+    quant_z += (vec->z > quant_midpoints_5b[quant_z]);
 
     int dequant_x = (quant_x << 3) | (quant_x >> 2);
     int dequant_y = (quant_y << 3) | (quant_y >> 2);
@@ -248,6 +337,9 @@ static inline Vec3i quantize_5b(Vec3f *vec)
     vec->y = (decimal)(dequant_y) * (1.0 / 255.0);
     vec->z = (decimal)(dequant_z) * (1.0 / 255.0);
 
+    assert((vec->x >= 0.0) && (vec->x <= 1.0));
+    assert((vec->y >= 0.0) && (vec->y <= 1.0));
+    assert((vec->z >= 0.0) && (vec->z <= 1.0));
     return Vec3i { quant_x, quant_y, quant_z };
 }
 
@@ -347,42 +439,48 @@ void encode_block_astc(
     //     maxcol_int.x, maxcol_int.y, maxcol_int.z
     // );
 
-    // Move the endpoints line segment such that mincol is at zero
-    Vec3f ep_vec = maxcol - mincol;
-    // Normalize the endpoint vector
-    // decimal norm = 1.0 / std::sqrt(ep_vec.dot(ep_vec));
-    // Vec3f ep_vec_norm = ep_vec * norm;
+    decimal downsampled_weights[MAX_PIXEL_COUNT] = { 0.0 };
 
-    // It works when the norm is squared, why?
-    Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
-
-    // Project all pixels onto the endpoint vector. For each pixel, the result
-    // tells how far it goes into the endpoint vector direction. Small values
-    // (-> 0.0) mean closer to mincol, large values (-> 1.0) mean closer to
-    // maxcol.
-    // In other words, the resulting array is the array of ideal weights,
-    // assuming there is no quantization.
-    decimal ideal_weights[MAX_PIXEL_COUNT];
-    for (int i = 0; i < pixel_count; ++i)
+    // TODO: use void extent to handle constant block
+    if (mincol_int != maxcol_int)
     {
-        ideal_weights[i] = fclamp(
-            (block_flt[i] - mincol).dot(ep_vec_scaled),
-            0.0,
-            1.0
+        // Move the endpoints line segment such that mincol is at zero
+        Vec3f ep_vec = maxcol - mincol;
+        // Normalize the endpoint vector
+        // decimal norm = 1.0 / std::sqrt(ep_vec.dot(ep_vec));
+        // Vec3f ep_vec_norm = ep_vec * norm;
+
+        // It works when the norm is squared, why?
+        Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
+        assert(ep_vec.dot(ep_vec) != 0.0);
+
+        // Project all pixels onto the endpoint vector. For each pixel, the result
+        // tells how far it goes into the endpoint vector direction. Small values
+        // (-> 0.0) mean closer to mincol, large values (-> 1.0) mean closer to
+        // maxcol.
+        // In other words, the resulting array is the array of ideal weights,
+        // assuming there is no quantization.
+        decimal ideal_weights[MAX_PIXEL_COUNT];
+        for (int i = 0; i < pixel_count; ++i)
+        {
+            ideal_weights[i] = fclamp(
+                (block_flt[i] - mincol).dot(ep_vec_scaled),
+                0.0,
+                1.0
+            );
+        }
+
+        // We downsample the weight grid before quantization
+        bilinear_downsample(
+            ideal_weights,
+            block_size_x,
+            block_size_y,
+            &bilin_weights,
+            downsampled_weights,
+            wgt_grid_w,
+            wgt_grid_h
         );
     }
-
-    // We downsample the weight grid before quantization
-    decimal downsampled_weights[MAX_PIXEL_COUNT];
-    bilinear_downsample(
-        ideal_weights,
-        block_size_x,
-        block_size_y,
-        &bilin_weights,
-        downsampled_weights,
-        wgt_grid_w,
-        wgt_grid_h
-    );
 
     // Quantize weights
     uint8_t quantized_weights[MAX_PIXEL_COUNT];
