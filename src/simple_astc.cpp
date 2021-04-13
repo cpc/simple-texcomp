@@ -363,15 +363,22 @@ void encode_block_astc(
 
     constexpr uint8_t MAX_PIXEL_COUNT = ASTC_MAX_BLOCK_DIM*ASTC_MAX_BLOCK_DIM;
 
-    // Convert the block into floating point
+    // Convert the block into floating point and determine the line through
+    // color space
     Vec3f block_flt[MAX_PIXEL_COUNT];
-    // TODO: this loop can be merged with find_minmaxcolor_bbox_astc()
+    Vec3f mincol = { F(1.0), F(1.0), F(1.0) };
+    Vec3f maxcol = { F(0.0), F(0.0), F(0.0) };
+
     for (int i = 0; i < pixel_count; ++i)
     {
         block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / F(255.0);
         block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / F(255.0);
         block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / F(255.0);
+
+        mincol = min3f(mincol, block_flt[i]);
+        maxcol = max3f(maxcol, block_flt[i]);
     }
+    // print_minmax("   ", mincol, maxcol);
 
     // Vec3f sum = { F(0.0), F(0.0), F(0.0) };
     // Vec3f sq_sum = { F(0.0), F(0.0), F(0.0) };
@@ -399,10 +406,6 @@ void encode_block_astc(
     //     (double)avg.x, (double)avg.y, (double)avg.z,
     //     (double)std.x, (double)std.y, (double)std.z);
 
-    // Determine line through color space
-    Vec3f mincol, maxcol;
-    find_minmaxcolor_bbox_astc(block_flt, pixel_count, &mincol, &maxcol);
-    // print_minmax("   ", mincol, maxcol);
 #if ASTC_SELECT_DIAG == 1
     bool swapped = select_diagonal(block_flt, pixel_count, &mincol, &maxcol);
     // if (swapped)
