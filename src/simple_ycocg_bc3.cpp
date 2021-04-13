@@ -37,8 +37,8 @@ static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
 /* Convert a f32 2-channel color into RG channels and scale into B channel */
 static inline uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
 {
-    uint32_t r = (uint32_t)round(color->x * F(31.0));
-    uint32_t g = (uint32_t)round(color->y * F(63.0));
+    uint32_t r = (uint32_t)std::round(color->x * F(31.0));
+    uint32_t g = (uint32_t)std::round(color->y * F(63.0));
 
     uint32_t out = (r << 11) | (g << 5) | (scale - 1);
 
@@ -83,7 +83,7 @@ static inline uint32_t get_cocg_scale(
     Vec2f m0 = abs2f(min_cocg - OFFSET);
     Vec2f m1 = abs2f(max_cocg - OFFSET);
 
-    decimal m = (decimal)fmax(fmax(m0.x, m0.y), fmax(m1.x, m1.y));
+    decimal m = (decimal)std::fmax(std::fmax(m0.x, m0.y), std::fmax(m1.x, m1.y));
 
     const decimal s0 = F(64.0) / F(255.0);
     const decimal s1 = F(32.0) / F(255.0);
@@ -198,8 +198,8 @@ void emit_endpoints_y(
 ){
     inset_bbox_y(min_y, max_y);
 
-    out_block->b8[0] = (uint8_t)(round(*max_y * F(255.0)));
-    out_block->b8[1] = (uint8_t)(round(*min_y * F(255.0)));
+    out_block->b8[0] = (uint8_t)(std::round(*max_y * F(255.0)));
+    out_block->b8[1] = (uint8_t)(std::round(*min_y * F(255.0)));
 }
 
 /* Write 3-bit Y indices into the rest of the BC4 block */

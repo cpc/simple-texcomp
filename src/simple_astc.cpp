@@ -102,7 +102,7 @@ void init_tables() {
         decimal f1 = decimal(((i+1) << 6) | ((i+1) << 4) | ((i+1) << 2) | (i+1)) / F(255.0);
         printf("%.8f, ", (double)((f0 + f1) * F(0.5)));
     }
-    printf("%.8f\n\n", F(1.0));
+    printf("%.8f\n\n", 1.0);
 
     for (int i = 0; i < 7; i++) {
         decimal f0 = decimal(((i+0) << 5) | ((i+0) << 2) | ((i+0) >> 1)) / F(255.0);

@@ -175,18 +175,18 @@ inline uint8_t u8clamp(uint8_t a, uint8_t amin, uint8_t amax)
 inline Vec3f min3f(const Vec3f &a, const Vec3f &b)
 {
     return Vec3f {
-        (decimal)fmin(a.x, b.x),
-        (decimal)fmin(a.y, b.y),
-        (decimal)fmin(a.z, b.z),
+        (decimal)std::fmin(a.x, b.x),
+        (decimal)std::fmin(a.y, b.y),
+        (decimal)std::fmin(a.z, b.z),
     };
 }
 
 inline Vec3f max3f(const Vec3f &a, const Vec3f &b)
 {
     return Vec3f {
-        (decimal)fmax(a.x, b.x),
-        (decimal)fmax(a.y, b.y),
-        (decimal)fmax(a.z, b.z),
+        (decimal)std::fmax(a.x, b.x),
+        (decimal)std::fmax(a.y, b.y),
+        (decimal)std::fmax(a.z, b.z),
     };
 }
 
@@ -218,7 +218,7 @@ inline Vec2f clamp2f(const Vec2f &a, decimal amin, decimal amax)
 
 inline Vec2f abs2f(const Vec2f &a)
 {
-    return Vec2f { (decimal)fabs(a.x), (decimal)fabs(a.y) };
+    return Vec2f { (decimal)std::fabs(a.x), (decimal)std::fabs(a.y) };
 }
 
 /* Compute squared distance of two vectors */

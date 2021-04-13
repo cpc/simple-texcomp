@@ -164,7 +164,7 @@ int main(int argc, char **argv)
     std::vector<decimal> inp_pixels_flt(inp_w*inp_h*nch);
     for (int i = 0; i < inp_h*inp_w*nch; ++i)
     {
-        inp_pixels_flt.at(i) = (decimal)(inp_pixels[i]) / 255.0;
+        inp_pixels_flt.at(i) = (decimal)(inp_pixels[i]) / F(255.0);
     }
 
     std::vector<decimal> out_pixels_flt(M*N*nch);
@@ -183,12 +183,12 @@ int main(int argc, char **argv)
     for (size_t i = 0; i < out_pixels.size(); ++i)
     {
         decimal out_pixel_flt = out_pixels_flt.at(i);
-        if (out_pixel_flt > 1.0)
+        if (out_pixel_flt > F(1.0))
         {
             printf("ERROR: Result pixel > 1.0: %ld, %.6f\n",
                 i, (double)out_pixel_flt);
         }
-        out_pixels.at(i) = (uint8_t)(out_pixel_flt * 255.0);
+        out_pixels.at(i) = (uint8_t)(out_pixel_flt * F(255.0));
     }
 
     ret = stbi_write_png(

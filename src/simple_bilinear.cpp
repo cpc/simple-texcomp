@@ -18,7 +18,7 @@ static decimal tent(decimal x, decimal center, decimal half_span)
 {
     if ( is_close_enough(x, center) )
     {
-        return 1.0;
+        return F(1.0);
     }
 
     if ( x > center )
@@ -30,7 +30,7 @@ static decimal tent(decimal x, decimal center, decimal half_span)
     decimal left = center - half_span;
     if ( is_close_enough(x, left) || (x < left) )
     {
-        return 0.0;
+        return F(0.0);
     }
 
     return (x - left) / (center - left);
@@ -67,21 +67,21 @@ int populate_bilinear_weights(
         }
     }
 
-    decimal step_x = 1.0 / ((decimal)(w_inp - 1));
-    decimal step_y = 1.0 / ((decimal)(h_inp - 1));
-    decimal step_m = 1.0 / ((decimal)(w_out - 1));
-    decimal step_n = 1.0 / ((decimal)(h_out - 1));
+    decimal step_x = F(1.0) / ((decimal)(w_inp - 1));
+    decimal step_y = F(1.0) / ((decimal)(h_inp - 1));
+    decimal step_m = F(1.0) / ((decimal)(w_out - 1));
+    decimal step_n = F(1.0) / ((decimal)(h_out - 1));
 
     // horizontal pass
-    decimal m = 0.0;
+    decimal m = F(0.0);
     for (int i = 0; i < w_out; ++i)
     {
-        decimal x = 0.0;
+        decimal x = F(0.0);
         uint8_t count = 0;
         for (int j = 0; j < w_inp; ++j)
         {
             decimal weight = tent(x, m, step_m);
-            if (weight > 0.0)
+            if (weight > F(0.0))
             {
                 bw->bilin_idx_x[i][count] = j;
                 bw->bilin_weights_x[i][count] = weight;
@@ -94,15 +94,15 @@ int populate_bilinear_weights(
     }
 
     // vertical pass
-    decimal n = 0.0;
+    decimal n = F(0.0);
     for (int i = 0; i < h_out; ++i)
     {
-        decimal y = 0.0;
+        decimal y = F(0.0);
         uint8_t count = 0;
         for (int j = 0; j < h_inp; ++j)
         {
             decimal weight = tent(y, n, step_n);
-            if (weight > 0.0)
+            if (weight > F(0.0))
             {
                 bw->bilin_idx_y[i][count] = j;
                 bw->bilin_weights_y[i][count] = weight;
@@ -138,7 +138,7 @@ void bilinear_downsample(
         {
             uint8_t pixel_count = bw->bilin_pixel_count_x[m];
             decimal weight_sum = 1e-11;  // prevent division by 0
-            decimal out_pixel = 0.0;
+            decimal out_pixel = F(0.0);
             for (uint8_t x = 0; x < pixel_count; ++x)
             {
                 uint8_t idx = bw->bilin_idx_x[m][x];
@@ -160,7 +160,7 @@ void bilinear_downsample(
         {
             uint8_t pixel_count = bw->bilin_pixel_count_y[n];
             decimal weight_sum = 1e-11;  // prevent division by 0
-            decimal out_pixel = 0.0;
+            decimal out_pixel = F(0.0);
             for (uint8_t y = 0; y < pixel_count; ++y)
             {
                 uint8_t idx = bw->bilin_idx_y[n][y];
