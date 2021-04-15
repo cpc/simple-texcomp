@@ -10,7 +10,7 @@ namespace simple::bc1 {
 constexpr decimal INSET_MARGIN = (F(8.0) / F(255.0)) / F(16.0);
 
 /* Find min/max color as a corners of a bounding box of the block */
-inline void find_minmaxcolor_bbox(
+void find_minmaxcolor_bbox(
     const Vec3f block[16],
     Vec3f *mincol,
     Vec3f *maxcol
@@ -33,7 +33,7 @@ inline void find_minmaxcolor_bbox(
 }
 
 /* Convert a color from RGB565 format into floating point */
-inline Vec3f rgb565_to_f32(uint16_t color)
+Vec3f rgb565_to_f32(uint16_t color)
 {
     uint8_t r = (color >> 11) & 0x1f;
     uint8_t g = (color >> 5) & 0x3f;

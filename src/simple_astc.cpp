@@ -28,7 +28,7 @@ struct astc_header
 	uint8_t dim_z[3];			// block count is inferred
 };
 
-static const uint32_t MAGIC_ID = 0x5CA1AB13;
+const uint32_t MAGIC_ID = 0x5CA1AB13;
 
 int store_astc_image(
 	const uint8_t* data,
@@ -82,15 +82,15 @@ int store_astc_image(
 
 // Quantization midpoints for better rounding
 // taken from: https://gist.github.com/castano/c92c7626f288f9e99e158520b14a61cf
-static const decimal quant_midpoints_2b[4] = {
+constexpr decimal quant_midpoints_2b[4] = {
     F(0.16666667), F(0.50000000), F(0.83333333), F(1.00000000)
 };
 
-static const decimal quant_midpoints_3b[8] = {
+constexpr decimal quant_midpoints_3b[8] = {
     F(0.07058824), F(0.21372549), F(0.35686275), F(0.50000000), F(0.64313725), F(0.78627451), F(0.92941176), F(1.00000000)
 };
 
-static const decimal quant_midpoints_5b[32] = {
+constexpr decimal quant_midpoints_5b[32] = {
     F(0.01568627), F(0.04705882), F(0.07843137), F(0.11176471), F(0.14509804), F(0.17647059), F(0.20784314), F(0.24117647),
     F(0.27450980), F(0.30588235), F(0.33725490), F(0.37058824), F(0.40392157), F(0.43529412), F(0.46666667), F(0.50000000),
     F(0.53333333), F(0.56470588), F(0.59607843), F(0.62941176), F(0.66274510), F(0.69411765), F(0.72549020), F(0.75882353),
@@ -125,7 +125,7 @@ void init_tables() {
 }
 
 /* Pre-computed bilinear filter weights */
-static bilin::bilinear_weights bilin_weights;
+bilin::bilinear_weights bilin_weights;
 
 int init_astc(
     int block_size_x,
@@ -146,7 +146,7 @@ int init_astc(
 
 // Taken from astcenc:
 // routine to write up to 8 bits
-static void write_bits(
+void write_bits(
 	int value,
 	int bitcount,
 	int bitoffset,
@@ -167,7 +167,7 @@ static void write_bits(
 }
 
 /* Taken from astcenc */
-static int bitrev8(int p)
+int bitrev8(int p)
 {
 	p = ((p & 0xF) << 4) | ((p >> 4) & 0xF);
 	p = ((p & 0x33) << 2) | ((p >> 2) & 0x33);
@@ -175,7 +175,7 @@ static int bitrev8(int p)
 	return p;
 }
 
-static void print_bin(unsigned int num, unsigned int nb)
+void print_bin(unsigned int num, unsigned int nb)
 {
 	for (uint b = 0; b < nb; ++b)
 	{
@@ -184,7 +184,7 @@ static void print_bin(unsigned int num, unsigned int nb)
 	}
 }
 
-static void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
+void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
 {
     Vec3f mincol2 = mincol * F(255.0);
     Vec3f maxcol2 = maxcol * F(255.0);
@@ -225,7 +225,7 @@ static void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
 // }
 
 /* Shrink the bounding box */
-static void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
+void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 {
     Vec3f inset = (*maxcol - *mincol) * (F(1.0) / F(16.0)) - INSET_MARGIN;
     *mincol = clamp3f(*mincol + inset, F(0.0), F(1.0));
@@ -236,7 +236,7 @@ static void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 /* Optional selection of either current or oposite diagonal - small potential
  * quality improvement at a small runtime cost
  */
-static bool select_diagonal(
+bool select_diagonal(
     const Vec3f *block,
     uint8_t pixel_count,
     Vec3f *mincol,
@@ -277,7 +277,7 @@ static bool select_diagonal(
  *
  * The input decimal does not need to be updated in our use case
  */
-static uint8_t quantize_2b(decimal x)
+uint8_t quantize_2b(decimal x)
 {
     assert((x >= F(0.0)) && (x <= F(1.0)));
     assert(!std::isnan(x));
@@ -310,7 +310,7 @@ static uint8_t quantize_2b(decimal x)
  * Returns the quantized input decimal as 8-bit integer and also modifies the
  * input decimal to the new value
  */
-static Vec3i quantize_5b(Vec3f *vec)
+Vec3i quantize_5b(Vec3f *vec)
 {
     assert(!std::isnan(vec->x));
     assert(!std::isnan(vec->y));

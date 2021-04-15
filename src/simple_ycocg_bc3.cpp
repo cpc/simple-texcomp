@@ -27,7 +27,7 @@ union bc_block_t
 };
 
 /* Convert RGB pixel to YCoCg */
-static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
+inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
 {
     return Vec3f {
         rgb.dot(Vec3f {  F(0.25), F(0.50),  F(0.25) }),
@@ -37,7 +37,7 @@ static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
 }
 
 /* Find min/max color as a corners of a bounding box of the block */
-inline void find_minmaxcolor_bbox(
+void find_minmaxcolor_bbox(
     const Vec3f block[16],
     Vec3f *mincol,
     Vec3f *maxcol
@@ -50,9 +50,9 @@ inline void find_minmaxcolor_bbox(
         assert(!std::isnan(block[i].x));
         assert(!std::isnan(block[i].y));
         assert(!std::isnan(block[i].z));
-        assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
-        assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
-        assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
+        assert((block[i].x >= F(0.0))); //&& (block[i].x <= F(1.0)));
+        assert((block[i].y >= F(0.0))); //&& (block[i].y <= F(1.0)));
+        assert((block[i].z >= F(0.0))); //&& (block[i].z <= F(1.0)));
 
         *mincol = min3f(*mincol, block[i]);
         *maxcol = max3f(*maxcol, block[i]);
@@ -60,7 +60,7 @@ inline void find_minmaxcolor_bbox(
 }
 
 /* Convert a color from RGB565 format into floating point */
-inline Vec3f rgb565_to_f32(uint16_t color)
+Vec3f rgb565_to_f32(uint16_t color)
 {
     uint8_t r = (color >> 11) & 0x1f;
     uint8_t g = (color >> 5) & 0x3f;
@@ -78,7 +78,7 @@ inline Vec3f rgb565_to_f32(uint16_t color)
 }
 
 /* Convert a f32 2-channel color into RG channels and scale into B channel */
-static uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
+uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
 {
     uint32_t r = (uint32_t)std::round(color->x * F(31.0));
     uint32_t g = (uint32_t)std::round(color->y * F(63.0));
@@ -95,7 +95,7 @@ static uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
 }
 
 /* Select either current or oposite diagonal */
-static void select_cocg_diagonal(
+void select_cocg_diagonal(
     const Vec3f block[16],
     Vec2f *__restrict__ min_cocg,
     Vec2f *__restrict__ max_cocg
@@ -119,7 +119,7 @@ static void select_cocg_diagonal(
 }
 
 /* Scale values up in case of low dynamic range */
-static uint32_t get_cocg_scale(
+uint32_t get_cocg_scale(
     const Vec2f &min_cocg,
     const Vec2f &max_cocg
 ){
@@ -286,7 +286,7 @@ void emit_indices_y(
 }
 
 /* Encode a block of 4x4 pixels into the YCoCg-BC3 format */
-void encode_block_ycocg(
+void encode_block(
     const uint8_t block_pixels[NCH_RGB*16],
     uint32_t out[4]
 ){
