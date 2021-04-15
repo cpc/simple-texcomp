@@ -9,6 +9,7 @@ project(
     'buildtype=debugoptimized',
     'warning_level=3',
     'b_ndebug=if-release',
+    'b_lto=true'
   ]
 )
 
@@ -27,6 +28,10 @@ if get_option('use_double')
   add_project_arguments('-DUSE_DOUBLE=1', language: 'cpp')
 else
   add_project_arguments('-DUSE_DOUBLE=0', language: 'cpp')
+endif
+
+if get_option('fast_math')
+  add_project_arguments('-ffast-math', language: 'cpp')
 endif
 
 includes = include_directories('src')

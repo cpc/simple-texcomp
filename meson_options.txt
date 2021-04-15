@@ -18,3 +18,10 @@ option(
   value: true,
   description: 'Use double in calculations or set it to false to use float.',
 )
+
+option(
+  'fast_math',
+  type: 'boolean',
+  value: true,
+  description: 'Enable fast math.',
+)
