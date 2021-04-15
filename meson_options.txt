@@ -2,7 +2,14 @@ option(
   'bc1_sel',
   type: 'boolean',
   value: true,
-  description: 'Do an additional select diagonal step in BC1 encoding.',
+  description: 'Run an additional select diagonal step in BC1 encoding.',
+)
+
+option(
+  'astc_sel',
+  type: 'boolean',
+  value: true,
+  description: 'Run an additional select diagonal step in ASTC encoding.',
 )
 
 option(

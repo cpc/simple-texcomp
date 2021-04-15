@@ -147,11 +147,10 @@ struct Vec3i
         };
     }
 
-    inline bool operator!=(const Vec3i &other) const
+    inline bool operator==(const Vec3i &other) const
     {
-        return !( (x == other.x) && (y == other.y) && (z == other.z) );
+        return (x == other.x) && (y == other.y) && (z == other.z);
     }
-
 };
 
 inline decimal fclamp(decimal a, decimal amin, decimal amax)

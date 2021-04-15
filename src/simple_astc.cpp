@@ -441,11 +441,20 @@ void encode_block_astc(
     //     maxcol_int.x, maxcol_int.y, maxcol_int.z
     // );
 
-    decimal downsampled_weights[MAX_PIXEL_COUNT] = { F(0.0) };
+    uint8_t quantized_weights[MAX_PIXEL_COUNT];
 
-    // TODO: use void extent to handle constant block
-    if (mincol_int != maxcol_int)
+    if (mincol_int == maxcol_int)
     {
+        // When both endpoints are the same, encode all weights and zeros and
+        // skip the calculation
+        for (int i = 0; i < wgt_count; ++i)
+        {
+            quantized_weights[i] = 0;
+        }
+    } else {
+        // Downsample and quantize the weights
+        decimal downsampled_weights[MAX_PIXEL_COUNT];
+
         // Move the endpoints line segment such that mincol is at zero
         Vec3f ep_vec = maxcol - mincol;
         // Normalize the endpoint vector
@@ -482,13 +491,12 @@ void encode_block_astc(
             wgt_grid_w,
             wgt_grid_h
         );
-    }
 
-    // Quantize weights
-    uint8_t quantized_weights[MAX_PIXEL_COUNT];
-    for (int i = 0; i < wgt_count; ++i)
-    {
-        quantized_weights[i] = quantize_2b(downsampled_weights[i]);
+        // Quantize weights
+        for (int i = 0; i < wgt_count; ++i)
+        {
+            quantized_weights[i] = quantize_2b(downsampled_weights[i]);
+        }
     }
 
     // Output buffers for quantized weights and output data
