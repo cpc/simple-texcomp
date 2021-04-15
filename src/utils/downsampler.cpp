@@ -19,6 +19,8 @@
 
 #include "simple_texcomp.hpp"
 
+using namespace simple;
+
 /* Exit with error, optionally printing usage */
 static void err_exit(const char* err_msg, bool print_usage=false)
 {
@@ -33,20 +35,20 @@ static void err_exit(const char* err_msg, bool print_usage=false)
     exit(1);
 }
 
-static void print_bilinear_weights(const bilinear_weights* bw)
+static void print_bilinear_weights(const bilin::bilinear_weights* bw)
 {
     printf("bilin_pixel_count_x = {\n");
-    for (int i = 0; i < ASTC_MAX_GRID_DIM; ++i)
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
         printf("%3d,", bw->bilin_pixel_count_x[i]);
     }
     printf("\n};\n");
 
     printf("\nbilin_idx_x = {\n");
-    for (int i = 0; i < ASTC_MAX_GRID_DIM; ++i)
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
         printf("    {");
-        for (int j = 0; j < ASTC_MAX_BLOCK_DIM; ++j)
+        for (int j = 0; j < astc::MAX_BLOCK_DIM; ++j)
         {
             printf("%3d,", bw->bilin_idx_x[i][j]);
         }
@@ -55,10 +57,10 @@ static void print_bilinear_weights(const bilinear_weights* bw)
     printf("};\n");
 
     printf("\nbilin_weights_x = {\n");
-    for (int i = 0; i < ASTC_MAX_GRID_DIM; ++i)
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
         printf("    {\n");
-        for (int j = 0; j < ASTC_MAX_BLOCK_DIM; ++j)
+        for (int j = 0; j < astc::MAX_BLOCK_DIM; ++j)
         {
             if (j % 6 == 0)
             {
@@ -75,17 +77,17 @@ static void print_bilinear_weights(const bilinear_weights* bw)
     printf("};\n");
 
     printf("\nbilin_pixel_count_y = {\n");
-    for (int i = 0; i < ASTC_MAX_GRID_DIM; ++i)
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
         printf("%3d,", bw->bilin_pixel_count_y[i]);
     }
     printf("\n};\n");
 
     printf("\nbilin_idx_y = {\n");
-    for (int i = 0; i < ASTC_MAX_GRID_DIM; ++i)
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
         printf("    {");
-        for (int j = 0; j < ASTC_MAX_BLOCK_DIM; ++j)
+        for (int j = 0; j < astc::MAX_BLOCK_DIM; ++j)
         {
             printf("%3d,", bw->bilin_idx_y[i][j]);
         }
@@ -94,10 +96,10 @@ static void print_bilinear_weights(const bilinear_weights* bw)
     printf("};\n");
 
     printf("\nbilin_weights_y = {\n");
-    for (int i = 0; i < ASTC_MAX_GRID_DIM; ++i)
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
         printf("    {\n");
-        for (int j = 0; j < ASTC_MAX_BLOCK_DIM; ++j)
+        for (int j = 0; j < astc::MAX_BLOCK_DIM; ++j)
         {
             if (j % 6 == 0)
             {
@@ -150,7 +152,7 @@ int main(int argc, char **argv)
     printf("%dx%d, %d channels\n", inp_w, inp_h, nch);
 
     // Pre-compute bilinear weights
-    bilinear_weights bw;
+    bilin::bilinear_weights bw;
     int ret = populate_bilinear_weights(inp_w, inp_h, &bw, M, N);
     if (ret != 0)
     {
@@ -169,7 +171,7 @@ int main(int argc, char **argv)
 
     std::vector<decimal> out_pixels_flt(M*N*nch);
 
-    bilinear_downsample(
+    downsample(
         inp_pixels_flt.data(),
         inp_w, inp_h,
         &bw,

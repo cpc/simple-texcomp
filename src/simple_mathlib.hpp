@@ -11,9 +11,11 @@
 
 #include "simple_texcomp.hpp"
 
+namespace simple {
+
 /* Endpoint interpolation constants */
-#define EP_LERP1  F(1.0) / F(3.0)
-#define EP_LERP2  F(2.0) / F(3.0)
+constexpr decimal EP_LERP1 = F(1.0) / F(3.0);
+constexpr decimal EP_LERP2 = F(2.0) / F(3.0);
 
 /* Helper structs and math */
 struct Vec3f
@@ -234,45 +236,6 @@ inline decimal distsq2f(const Vec2f &a, const Vec2f &b)
     return diff.dot(diff);
 }
 
-/* Find min/max color as a corners of a bounding box of the block */
-inline void find_minmaxcolor_bbox(
-    const Vec3f block[16],
-    Vec3f *mincol,
-    Vec3f *maxcol
-){
-    *mincol = { F(1.0), F(1.0), F(1.0) };
-    *maxcol = { F(0.0), F(0.0), F(0.0) };
-
-    for (int i = 0; i < 16; ++i)
-    {
-        assert(!std::isnan(block[i].x));
-        assert(!std::isnan(block[i].y));
-        assert(!std::isnan(block[i].z));
-        assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
-        assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
-        assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
-
-        *mincol = min3f(*mincol, block[i]);
-        *maxcol = max3f(*maxcol, block[i]);
-    }
-}
-
-/* Convert a color from RGB565 format into floating point */
-inline Vec3f rgb565_to_f32(uint16_t color)
-{
-    uint8_t r = (color >> 11) & 0x1f;
-    uint8_t g = (color >> 5) & 0x3f;
-    uint8_t b = color & 0x1f;
-
-    r = (r << 3) | (r >> 2);
-    g = (g << 2) | (g >> 4);
-    b = (b << 3) | (b >> 2);
-
-    return Vec3f {
-        (decimal)(r) / F(255.0),
-        (decimal)(g) / F(255.0),
-        (decimal)(b) / F(255.0),
-    };
 }
 
 #endif // SIMPLE_MATHLIB_HPP

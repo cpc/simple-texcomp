@@ -4,6 +4,8 @@
 
 #include "simple_texcomp.hpp"
 
+namespace simple::bilin {
+
 /** Test if two floating point numbers are almost equal */
 static inline bool is_close_enough(decimal a, decimal b)
 {
@@ -47,19 +49,19 @@ int populate_bilinear_weights(
 ){
     if ( (w_out > w_inp)
         || (h_out > h_inp)
-        || (w_inp > ASTC_MAX_BLOCK_DIM)
-        || (h_inp > ASTC_MAX_BLOCK_DIM)
-        || (w_out > ASTC_MAX_GRID_DIM)
-        || (h_out > ASTC_MAX_GRID_DIM) )
+        || (w_inp > astc::MAX_BLOCK_DIM)
+        || (h_inp > astc::MAX_BLOCK_DIM)
+        || (w_out > astc::MAX_GRID_DIM)
+        || (h_out > astc::MAX_GRID_DIM) )
     {
         return 1;
     }
 
-    for (int i = 0; i < ASTC_MAX_GRID_DIM; ++i)
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
         bw->bilin_pixel_count_x[i] = 0;
         bw->bilin_pixel_count_y[i] = 0;
-        for (int j = 0; j < ASTC_MAX_BLOCK_DIM; ++j)
+        for (int j = 0; j < astc::MAX_BLOCK_DIM; ++j)
         {
             bw->bilin_idx_x[i][j] = 0;
             bw->bilin_idx_y[i][j] = 0;
@@ -120,7 +122,7 @@ int populate_bilinear_weights(
 }
 
 /** See top header for description */
-void bilinear_downsample(
+void downsample(
     const decimal *__restrict__ inp,
     int w_inp,
     int h_inp,
@@ -130,7 +132,7 @@ void bilinear_downsample(
     int h_out
 ){
     // Buffer for holding intermediate results
-    static decimal tmp[ASTC_MAX_BLOCK_DIM*ASTC_MAX_GRID_DIM];
+    static decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
 
     // First, interpolate rows.
     for (int y = 0; y < h_inp; ++y)
@@ -178,3 +180,5 @@ void bilinear_downsample(
         }
     }
 }
+
+} // namespace

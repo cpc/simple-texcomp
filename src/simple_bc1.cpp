@@ -4,8 +4,52 @@
 #include "simple_texcomp.hpp"
 #include "simple_mathlib.hpp"
 
-/* */
-#define INSET_MARGIN  (F(8.0) / F(255.0)) / F(16.0)
+namespace simple::bc1 {
+
+/* How much to shrink the bounding box */
+constexpr decimal INSET_MARGIN = (F(8.0) / F(255.0)) / F(16.0);
+
+/* Find min/max color as a corners of a bounding box of the block */
+inline void find_minmaxcolor_bbox(
+    const Vec3f block[16],
+    Vec3f *mincol,
+    Vec3f *maxcol
+){
+    *mincol = { F(1.0), F(1.0), F(1.0) };
+    *maxcol = { F(0.0), F(0.0), F(0.0) };
+
+    for (int i = 0; i < 16; ++i)
+    {
+        assert(!std::isnan(block[i].x));
+        assert(!std::isnan(block[i].y));
+        assert(!std::isnan(block[i].z));
+        assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
+        assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
+        assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
+
+        *mincol = min3f(*mincol, block[i]);
+        *maxcol = max3f(*maxcol, block[i]);
+    }
+}
+
+/* Convert a color from RGB565 format into floating point */
+inline Vec3f rgb565_to_f32(uint16_t color)
+{
+    uint8_t r = (color >> 11) & 0x1f;
+    uint8_t g = (color >> 5) & 0x3f;
+    uint8_t b = color & 0x1f;
+
+    r = (r << 3) | (r >> 2);
+    g = (g << 2) | (g >> 4);
+    b = (b << 3) | (b >> 2);
+
+    return Vec3f {
+        (decimal)(r) / F(255.0),
+        (decimal)(g) / F(255.0),
+        (decimal)(b) / F(255.0),
+    };
+}
+
 
 /* Convert a floating-point color into the RGB565 format */
 uint32_t f32_to_rgb565(Vec3f *color)
@@ -124,7 +168,7 @@ uint32_t emit_indices(
 }
 
 /* Encode a block of 4x4 pixels into the BC1 format */
-void encode_block_bc1(
+void encode_block(
     const uint8_t block_pixels[NCH_RGB*16],
     uint32_t out[2]
 ){
@@ -153,7 +197,7 @@ void encode_block_bc1(
 }
 
 /* Decode an encoded block into an array of 16 pixels */
-void decode_block_bc1(
+void decode_block(
     const uint32_t enc_block[2],
     uint8_t out_pixels[NCH_RGB*16]
 ){
@@ -172,3 +216,5 @@ void decode_block_bc1(
         out_pixels[NCH_RGB*i+2] = (uint8_t)(res.z * F(255.0));
     }
 }
+
+} // namespace

@@ -18,6 +18,7 @@
 #include "simple_texcomp.hpp"
 
 namespace fs = std::filesystem;
+using namespace simple;
 
 /* Possible encoding formats */
 typedef enum enc_format_t {
@@ -55,8 +56,8 @@ void pad_image(
     int& pad_h
 ){
     // Input block size
-    const int block_w = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_X : 4;
-    const int block_h = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_Y : 4;
+    const int block_w = (ENC_FORMAT == ASTC) ? astc::BLOCK_X : 4;
+    const int block_h = (ENC_FORMAT == ASTC) ? astc::BLOCK_Y : 4;
 
     // Number of blocks in horizontal and vertical dimension
     const int nblocks_x = ( img_w + (block_w - 1) ) / block_w;
@@ -130,8 +131,8 @@ int encode_image(
     std::vector<uint32_t>& enc_data
 ){
     // Input block size
-    const int block_w = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_X : 4;
-    const int block_h = (ENC_FORMAT == ASTC) ? ASTC_BLOCK_Y : 4;
+    const int block_w = (ENC_FORMAT == ASTC) ? astc::BLOCK_X : 4;
+    const int block_h = (ENC_FORMAT == ASTC) ? astc::BLOCK_Y : 4;
 
     // Number of blocks in horizontal and vertical dimension
     const int nblocks_x = img_w / block_w;
@@ -146,15 +147,15 @@ int encode_image(
     switch (ENC_FORMAT) {
     case BC1:
         block_nints = 2;  // 64 bits per 4x4 block
-        encode_block = encode_block_bc1;
+        encode_block = bc1::encode_block;
         break;
     case YCOCG_BC3:
         block_nints = 4; // 128 bits per 4x4 block
-        encode_block = encode_block_ycocg_bc3;
+        encode_block = ycocg_bc3::encode_block;
         break;
     case ASTC:
         block_nints = 4; // 128 bits per block
-        encode_block = encode_block_astc;
+        encode_block = astc::encode_block;
         break;
     default:
         fprintf(stderr, "ERROR: Unsupported encoding format\n");
@@ -215,11 +216,11 @@ int decode_image(
     switch (ENC_FORMAT) {
     case BC1:
         block_nints = 2;  // 64 bits per 4x4 block
-        decode_block = decode_block_bc1;
+        decode_block = bc1::decode_block;
         break;
     case YCOCG_BC3:
         block_nints = 4; // 128 bits per 4x4 block
-        decode_block = decode_block_ycocg_bc3;
+        decode_block = ycocg_bc3::decode_block;
         break;
     case ASTC:
         return 0;
@@ -301,7 +302,7 @@ int main(int argc, char **argv)
     // Init & print out format-specific info
     if (ENC_FORMAT == ASTC)
     {
-        init_astc(12, 12, 8, 5);
+        astc::init_astc(12, 12, 8, 5);
         printf("WARNING: ASTC format decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
                " directory.\n");
@@ -390,7 +391,7 @@ int main(int argc, char **argv)
             std::string out_name = out_dir
                 / fs::path(inp_name).filename().replace_extension(".astc");
             printf("-- Saving encoded image to '%s'\n", out_name.data());
-            int ret = store_astc_image(
+            int ret = astc::store_astc_image(
                 (uint8_t*)enc_data.data(),
                 4*enc_data.size(),
                 inp_w,

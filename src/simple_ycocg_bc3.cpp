@@ -4,13 +4,15 @@
 #include "simple_texcomp.hpp"
 #include "simple_mathlib.hpp"
 
-/*
+namespace simple::ycocg_bc3 {
+
+/* How much to shrink the bounding box
  * = (8.0/255.0)/16.0 for CoCg and (16.0/255.0)/32.0 for Y */
-#define INSET_MARGIN_Y  (F(16.0) / F(255.0)) / F(32.0)
-#define INSET_MARGIN_COCG  (F(8.0) / F(255.0)) / F(16.0)
+constexpr decimal INSET_MARGIN_Y = (F(16.0) / F(255.0)) / F(32.0);
+constexpr decimal INSET_MARGIN_COCG = (F(8.0) / F(255.0)) / F(16.0);
 
 /* Offset to center color value at grey level (= 128.0/255.0) */
-#define OFFSET  F(128.0) / F(255.0)
+constexpr decimal OFFSET = F(128.0) / F(255.0);
 
 /* Helper type for easier access of 16b and 32b words inside a 64b block
  *
@@ -31,6 +33,47 @@ static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
         rgb.dot(Vec3f {  F(0.25), F(0.50),  F(0.25) }),
         rgb.dot(Vec3f {  F(0.50), F(0.00), -F(0.50) }) + OFFSET,
         rgb.dot(Vec3f { -F(0.25), F(0.50), -F(0.25) }) + OFFSET,
+    };
+}
+
+/* Find min/max color as a corners of a bounding box of the block */
+inline void find_minmaxcolor_bbox(
+    const Vec3f block[16],
+    Vec3f *mincol,
+    Vec3f *maxcol
+){
+    *mincol = { F(1.0), F(1.0), F(1.0) };
+    *maxcol = { F(0.0), F(0.0), F(0.0) };
+
+    for (int i = 0; i < 16; ++i)
+    {
+        assert(!std::isnan(block[i].x));
+        assert(!std::isnan(block[i].y));
+        assert(!std::isnan(block[i].z));
+        assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
+        assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
+        assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
+
+        *mincol = min3f(*mincol, block[i]);
+        *maxcol = max3f(*maxcol, block[i]);
+    }
+}
+
+/* Convert a color from RGB565 format into floating point */
+inline Vec3f rgb565_to_f32(uint16_t color)
+{
+    uint8_t r = (color >> 11) & 0x1f;
+    uint8_t g = (color >> 5) & 0x3f;
+    uint8_t b = color & 0x1f;
+
+    r = (r << 3) | (r >> 2);
+    g = (g << 2) | (g >> 4);
+    b = (b << 3) | (b >> 2);
+
+    return Vec3f {
+        (decimal)(r) / F(255.0),
+        (decimal)(g) / F(255.0),
+        (decimal)(b) / F(255.0),
     };
 }
 
@@ -243,7 +286,7 @@ void emit_indices_y(
 }
 
 /* Encode a block of 4x4 pixels into the YCoCg-BC3 format */
-void encode_block_ycocg_bc3(
+void encode_block_ycocg(
     const uint8_t block_pixels[NCH_RGB*16],
     uint32_t out[4]
 ){
@@ -290,7 +333,7 @@ void encode_block_ycocg_bc3(
 }
 
 /* Decode an encoded block into an array of 16 pixels */
-void decode_block_ycocg_bc3(
+void decode_block(
     const uint32_t enc_block[4],
     uint8_t out_pixels[NCH_RGB*16]
 ){
@@ -350,3 +393,5 @@ void decode_block_ycocg_bc3(
         out_pixels[NCH_RGB*i+2] = (uint8_t)(b * F(255.0));
     }
 }
+
+} // namespace

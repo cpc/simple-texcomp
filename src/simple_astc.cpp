@@ -5,10 +5,12 @@
 #include "simple_mathlib.hpp"
 #include "simple_texcomp.hpp"
 
+namespace simple::astc {
+
 /**
  * TODO: Optimize this for different quantizations
  */
-#define INSET_MARGIN  (F(8.0) / F(255.0)) / F(16.0)
+constexpr decimal INSET_MARGIN = (F(8.0) / F(255.0)) / F(16.0);
 
 /* ============================================================================
 	ASTC compressed file handling
@@ -26,7 +28,7 @@ struct astc_header
 	uint8_t dim_z[3];			// block count is inferred
 };
 
-static const uint32_t ASTC_MAGIC_ID = 0x5CA1AB13;
+static const uint32_t MAGIC_ID = 0x5CA1AB13;
 
 int store_astc_image(
 	const uint8_t* data,
@@ -36,13 +38,13 @@ int store_astc_image(
 	const char* filename
 ) {
 	astc_header header;
-	header.magic[0] =  ASTC_MAGIC_ID        & 0xFF;
-	header.magic[1] = (ASTC_MAGIC_ID >>  8) & 0xFF;
-	header.magic[2] = (ASTC_MAGIC_ID >> 16) & 0xFF;
-	header.magic[3] = (ASTC_MAGIC_ID >> 24) & 0xFF;
+	header.magic[0] =  MAGIC_ID        & 0xFF;
+	header.magic[1] = (MAGIC_ID >>  8) & 0xFF;
+	header.magic[2] = (MAGIC_ID >> 16) & 0xFF;
+	header.magic[3] = (MAGIC_ID >> 24) & 0xFF;
 
-	header.block_x = ASTC_BLOCK_X;
-	header.block_y = ASTC_BLOCK_Y;
+	header.block_x = BLOCK_X;
+	header.block_y = BLOCK_Y;
 	header.block_z = 1;
 
 	header.dim_x[0] =  dim_x        & 0xFF;
@@ -123,7 +125,7 @@ void init_tables() {
 }
 
 /* Pre-computed bilinear filter weights */
-static bilinear_weights bilin_weights;
+static bilin::bilinear_weights bilin_weights;
 
 int init_astc(
     int block_size_x,
@@ -343,8 +345,8 @@ static Vec3i quantize_5b(Vec3f *vec)
     return Vec3i { quant_x, quant_y, quant_z };
 }
 
-void encode_block_astc(
-    const uint8_t block_pixels[NCH_RGB*ASTC_BLOCK_X*ASTC_BLOCK_Y],
+void encode_block(
+    const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
     uint32_t out[4]
 ){
     const uint16_t block_mode = 102;
@@ -361,7 +363,7 @@ void encode_block_astc(
     const uint8_t block_size_y = 12;
     const uint8_t pixel_count = block_size_x * block_size_y;
 
-    constexpr uint8_t MAX_PIXEL_COUNT = ASTC_MAX_BLOCK_DIM*ASTC_MAX_BLOCK_DIM;
+    constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
 
     // Convert the block into floating point and determine the line through
     // color space
@@ -482,7 +484,7 @@ void encode_block_astc(
         }
 
         // We downsample the weight grid before quantization
-        bilinear_downsample(
+        bilin::downsample(
             ideal_weights,
             block_size_x,
             block_size_y,
@@ -619,8 +621,4 @@ void encode_block_astc(
 #endif
 }
 
-// void decode_block_astc(
-//     const uint32_t enc_block[4],
-//     uint8_t out_pixels[NCH_RGB*16]
-// ){
-// }
+} // namespace
