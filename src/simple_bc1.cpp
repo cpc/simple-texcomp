@@ -8,7 +8,7 @@
 #define INSET_MARGIN  (F(8.0) / F(255.0)) / F(16.0)
 
 /* Convert a floating-point color into the RGB565 format */
-static inline uint32_t f32_to_rgb565(Vec3f *color)
+uint32_t f32_to_rgb565(Vec3f *color)
 {
     uint32_t r = (uint32_t)std::round(color->x * F(31.0));
     uint32_t g = (uint32_t)std::round(color->y * F(63.0));
@@ -31,7 +31,7 @@ static inline uint32_t f32_to_rgb565(Vec3f *color)
 /* Optional selection of either current or oposite diagonal - small potential
  * quality improvement at a small runtime cost
  */
-static inline void select_diagonal(
+void select_diagonal(
     const Vec3f block[16],
     Vec3f *mincol,
     Vec3f *maxcol
@@ -60,7 +60,7 @@ static inline void select_diagonal(
 #endif  // BC1_SELECT_DIAG
 
 /* Shrink the bounding box */
-static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
+void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 {
     Vec3f inset = (*maxcol - *mincol) * (F(1.0) / F(16.0)) - INSET_MARGIN;
     *mincol = clamp3f(*mincol + inset, F(0.0), F(1.0));
@@ -68,7 +68,7 @@ static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 }
 
 /* Write two 16b endpoints to a 32b integer (MSB - mincol, LSB - maxcol) */
-static inline uint32_t emit_endpoints(Vec3f *mincol, Vec3f *maxcol)
+uint32_t emit_endpoints(Vec3f *mincol, Vec3f *maxcol)
 {
     uint32_t mincol_565 = f32_to_rgb565(mincol);
     uint32_t maxcol_565 = f32_to_rgb565(maxcol);
@@ -86,7 +86,7 @@ static inline uint32_t emit_endpoints(Vec3f *mincol, Vec3f *maxcol)
 }
 
 /* Write 2-bit indices to a 32b integer */
-static inline uint32_t emit_indices(
+uint32_t emit_indices(
     const Vec3f block[16],
     const Vec3f &mincol,
     const Vec3f &maxcol

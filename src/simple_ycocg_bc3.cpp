@@ -35,7 +35,7 @@ static inline Vec3f rgb_to_ycocg(const Vec3f &rgb)
 }
 
 /* Convert a f32 2-channel color into RG channels and scale into B channel */
-static inline uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
+static uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
 {
     uint32_t r = (uint32_t)std::round(color->x * F(31.0));
     uint32_t g = (uint32_t)std::round(color->y * F(63.0));
@@ -52,10 +52,10 @@ static inline uint32_t f32scale_to_rgb565(Vec2f *color, uint32_t scale)
 }
 
 /* Select either current or oposite diagonal */
-static inline void select_cocg_diagonal(
+static void select_cocg_diagonal(
     const Vec3f block[16],
-    Vec2f *min_cocg,
-    Vec2f *max_cocg
+    Vec2f *__restrict__ min_cocg,
+    Vec2f *__restrict__ max_cocg
 ){
     Vec2f center = (*min_cocg + *max_cocg) * F(0.5);
 
@@ -76,7 +76,7 @@ static inline void select_cocg_diagonal(
 }
 
 /* Scale values up in case of low dynamic range */
-static inline uint32_t get_cocg_scale(
+static uint32_t get_cocg_scale(
     const Vec2f &min_cocg,
     const Vec2f &max_cocg
 ){
@@ -101,8 +101,8 @@ static inline uint32_t get_cocg_scale(
 
 /* Shrink the bounding box around the Co and Cg channels */
 void inset_bbox_cocg(
-    Vec2f *min_cocg,
-    Vec2f *max_cocg
+    Vec2f *__restrict__ min_cocg,
+    Vec2f *__restrict__ max_cocg
 ){
     Vec2f inset = (*max_cocg - *min_cocg) * (F(1.0) / F(16.0)) - INSET_MARGIN_COCG;
     *min_cocg = clamp2f(*min_cocg + inset, F(0.0), F(1.0));
@@ -111,10 +111,10 @@ void inset_bbox_cocg(
 
 /* Write endpoints to the BC1 block */
 void emit_endpoints_cocg(
-    Vec2f *min_cocg,
-    Vec2f *max_cocg,
+    Vec2f *__restrict__ min_cocg,
+    Vec2f *__restrict__ max_cocg,
     uint32_t scale,
-    bc_block_t *out_block
+    bc_block_t *__restrict__ out_block
 ){
     // Scale
     *min_cocg = (*min_cocg - OFFSET) * scale + OFFSET;
@@ -182,8 +182,8 @@ void emit_indices_cocg(
 
 /* Shrink the bounding box around the Y channel */
 void inset_bbox_y(
-    decimal *min_y,
-    decimal *max_y
+    decimal *__restrict__ min_y,
+    decimal *__restrict__ max_y
 ){
     decimal inset = (*max_y - *min_y) / F(32.0) - INSET_MARGIN_Y;
     *min_y = fclamp(*min_y + inset, F(0.0), F(1.0));
@@ -192,9 +192,9 @@ void inset_bbox_y(
 
 /* Write Y endpoints into the BC4 block, each 8 bits */
 void emit_endpoints_y(
-    decimal *min_y,
-    decimal *max_y,
-    bc_block_t *out_block
+    decimal *__restrict__ min_y,
+    decimal *__restrict__ max_y,
+    bc_block_t *__restrict__ out_block
 ){
     inset_bbox_y(min_y, max_y);
 

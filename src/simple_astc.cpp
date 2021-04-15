@@ -144,7 +144,7 @@ int init_astc(
 
 // Taken from astcenc:
 // routine to write up to 8 bits
-static inline void write_bits(
+static void write_bits(
 	int value,
 	int bitcount,
 	int bitoffset,
@@ -165,7 +165,7 @@ static inline void write_bits(
 }
 
 /* Taken from astcenc */
-static inline int bitrev8(int p)
+static int bitrev8(int p)
 {
 	p = ((p & 0xF) << 4) | ((p >> 4) & 0xF);
 	p = ((p & 0x33) << 2) | ((p >> 2) & 0x33);
@@ -199,31 +199,31 @@ static void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
 }
 
 /* Find min/max color as a corners of a bounding box of the block */
-static void find_minmaxcolor_bbox_astc(
-    const Vec3f* block,
-    int pixel_count,
-    Vec3f *mincol,
-    Vec3f *maxcol
-){
-    *mincol = { F(1.0), F(1.0), F(1.0) };
-    *maxcol = { F(0.0), F(0.0), F(0.0) };
+// static void find_minmaxcolor_bbox_astc(
+//     const Vec3f* block,
+//     int pixel_count,
+//     Vec3f *mincol,
+//     Vec3f *maxcol
+// ){
+//     *mincol = { F(1.0), F(1.0), F(1.0) };
+//     *maxcol = { F(0.0), F(0.0), F(0.0) };
 
-    for (int i = 0; i < pixel_count; ++i)
-    {
-        assert(!std::isnan(block[i].x));
-        assert(!std::isnan(block[i].y));
-        assert(!std::isnan(block[i].z));
-        assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
-        assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
-        assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
+//     for (int i = 0; i < pixel_count; ++i)
+//     {
+//         assert(!std::isnan(block[i].x));
+//         assert(!std::isnan(block[i].y));
+//         assert(!std::isnan(block[i].z));
+//         assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
+//         assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
+//         assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
 
-        *mincol = min3f(*mincol, block[i]);
-        *maxcol = max3f(*maxcol, block[i]);
-    }
-}
+//         *mincol = min3f(*mincol, block[i]);
+//         *maxcol = max3f(*maxcol, block[i]);
+//     }
+// }
 
 /* Shrink the bounding box */
-static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
+static void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 {
     Vec3f inset = (*maxcol - *mincol) * (F(1.0) / F(16.0)) - INSET_MARGIN;
     *mincol = clamp3f(*mincol + inset, F(0.0), F(1.0));
@@ -234,7 +234,7 @@ static inline void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
 /* Optional selection of either current or oposite diagonal - small potential
  * quality improvement at a small runtime cost
  */
-static inline bool select_diagonal(
+static bool select_diagonal(
     const Vec3f *block,
     uint8_t pixel_count,
     Vec3f *mincol,
@@ -275,7 +275,7 @@ static inline bool select_diagonal(
  *
  * The input decimal does not need to be updated in our use case
  */
-static inline uint8_t quantize_2b(decimal x)
+static uint8_t quantize_2b(decimal x)
 {
     assert((x >= F(0.0)) && (x <= F(1.0)));
     assert(!std::isnan(x));
@@ -308,7 +308,7 @@ static inline uint8_t quantize_2b(decimal x)
  * Returns the quantized input decimal as 8-bit integer and also modifies the
  * input decimal to the new value
  */
-static inline Vec3i quantize_5b(Vec3f *vec)
+static Vec3i quantize_5b(Vec3f *vec)
 {
     assert(!std::isnan(vec->x));
     assert(!std::isnan(vec->y));

@@ -5,7 +5,7 @@ project(
   'simple-texcomp',
   'cpp',
   default_options: [
-    'cpp_std=c++17', # due to std::filesystem, otherwise could be lower
+    'cpp_std=c++20', # c++17 for std::filesystem, c++20 for designated initializers
     'buildtype=debugoptimized',
     'warning_level=3',
     'b_ndebug=if-release',

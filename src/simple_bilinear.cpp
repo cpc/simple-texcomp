@@ -121,11 +121,11 @@ int populate_bilinear_weights(
 
 /** See top header for description */
 void bilinear_downsample(
-    const decimal* inp,
+    const decimal *__restrict__ inp,
     int w_inp,
     int h_inp,
-    const bilinear_weights* bw,
-    decimal* out,
+    const bilinear_weights *__restrict__ bw,
+    decimal *__restrict__ out,
     int w_out,
     int h_out
 ){
