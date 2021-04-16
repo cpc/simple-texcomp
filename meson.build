@@ -6,7 +6,7 @@ project(
   'cpp',
   default_options: [
     'cpp_std=c++20', # c++17 for std::filesystem, c++20 for designated initializers
-    'buildtype=debugoptimized',
+    'buildtype=release',
     'warning_level=3',
     'b_ndebug=if-release',
     'b_lto=true'
@@ -34,6 +34,9 @@ if get_option('fast_math')
   add_project_arguments('-ffast-math', language: 'cpp')
 endif
 
+scalar_args = [ '-fno-slp-vectorize', '-fno-vectorize',  '-fno-tree-vectorize', ]
+vector_args = [ '-march=native' ]
+
 includes = include_directories('src')
 stb_includes = include_directories('extern/stb', is_system: true)
 
@@ -54,10 +57,19 @@ executable(
   'downsampler',
   src_downsampler,
   include_directories: [ includes, stb_includes ],
+  cpp_args: vector_args,
 )
 
 executable(
   'transcoder',
   src_transcoder,
   include_directories: [ includes, stb_includes ],
+  cpp_args: vector_args,
+)
+
+executable(
+  'transcoder-scalar',
+  src_transcoder,
+  include_directories: [ includes, stb_includes ],
+  cpp_args: scalar_args,
 )
