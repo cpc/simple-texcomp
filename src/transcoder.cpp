@@ -310,7 +310,13 @@ int main(int argc, char **argv)
 
     if (ENC_FORMAT == BC1)
     {
-        printf("INFO: BC1 is compiled with SELECT_DIAG=%d\n", BC1_SELECT_DIAG);
+        printf("INFO: BC1 is compiled with BC1_SELECT_DIAG=%d\n", BC1_SELECT_DIAG);
+    }
+
+    if (ENC_FORMAT == ASTC)
+    {
+        printf("INFO: ASTC is compiled with ASTC_SELECT_DIAG=%d\n", ASTC_SELECT_DIAG);
+        printf("INFO: ASTC is compiled with ASTC_TRIM_ENDPOINTS=%d\n", ASTC_TRIM_ENDPOINTS);
     }
 
     // Error code

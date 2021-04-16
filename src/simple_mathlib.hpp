@@ -33,6 +33,15 @@ struct Vec3f
         };
     }
 
+    inline Vec3f operator+(decimal a) const
+    {
+        return Vec3f {
+            x + a,
+            y + a,
+            z + a,
+        };
+    }
+
     inline Vec3f operator-(const Vec3f &other) const
     {
         return Vec3f {

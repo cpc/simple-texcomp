@@ -36,6 +36,13 @@ const decimal EPSILON = 1e-6f;
 #define ASTC_SELECT_DIAG  1
 #endif
 
+/* Advanced endpoint selection method that minimizes the effect of outliers
+ * 1 - enable, 0 - disable
+ */
+#ifndef ASTC_TRIM_ENDPOINTS
+#define ASTC_TRIM_ENDPOINTS  0
+#endif
+
 namespace astc {
 
     /* Input ASTC block size */

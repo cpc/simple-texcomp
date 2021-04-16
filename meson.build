@@ -24,6 +24,18 @@ else
   add_project_arguments('-DBC1_SELECT_DIAG=0', language: 'cpp')
 endif
 
+if get_option('astc_sel')
+  add_project_arguments('-DASTC_SELECT_DIAG=1', language: 'cpp')
+else
+  add_project_arguments('-DASTC_SELECT_DIAG=0', language: 'cpp')
+endif
+
+if get_option('astc_trim_endpoints')
+  add_project_arguments('-DASTC_TRIM_ENDPOINTS=1', language: 'cpp')
+else
+  add_project_arguments('-DASTC_TRIM_ENDPOINTS=0', language: 'cpp')
+endif
+
 if get_option('use_double')
   add_project_arguments('-DUSE_DOUBLE=1', language: 'cpp')
 else

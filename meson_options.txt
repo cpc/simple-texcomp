@@ -13,6 +13,13 @@ option(
 )
 
 option(
+  'astc_trim_endpoints',
+  type: 'boolean',
+  value: false,
+  description: 'Use advanced endpoint calculation that eliminates outliers.',
+)
+
+option(
   'use_double',
   type: 'boolean',
   value: true,

@@ -232,6 +232,53 @@ void inset_bbox(Vec3f *mincol, Vec3f *maxcol)
     *maxcol = clamp3f(*maxcol - inset, F(0.0), F(1.0));
 }
 
+/** Find min/max values but consider only values within 2.0*stddev
+ */
+void find_minmax_trimmed(
+    const Vec3f *block,
+    uint8_t pixel_count,
+    const Vec3f &avg,
+    const Vec3f &std,
+    Vec3f *mincol,
+    Vec3f *maxcol
+){
+    // Vec3f avg2 = avg * F(255.0);
+    // Vec3f std2 = std * F(255.0);
+    // printf("       avg: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+    //     (double)avg.x, (double)avg.y, (double)avg.z,
+    //     (double)avg2.x, (double)avg2.y, (double)avg2.z);
+    // printf("       std: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+    //     (double)std.x, (double)std.y, (double)std.z,
+    //     (double)std2.x, (double)std2.y, (double)std2.z);
+
+    // TODO rlcamp, lclamp
+    Vec3f stdmax = clamp3f(avg + std*F(2.0), F(0.0), F(1.0));
+    Vec3f stdmin = clamp3f(avg - std*F(2.0), F(0.0), F(1.0));
+    *mincol = avg;
+    *maxcol = avg;
+    // print_minmax("s2 ", stdmin, stdmax);
+    for (int i = 0; i < pixel_count; ++i)
+    {
+        if ((block[i].x < stdmax.x) && (block[i].x > stdmin.x))
+        {
+            maxcol->x = std::fmax(maxcol->x, block[i].x);
+            mincol->x = std::fmin(mincol->x, block[i].x);
+        }
+
+        if ((block[i].y < stdmax.y) && (block[i].y > stdmin.y))
+        {
+            maxcol->y = std::fmax(maxcol->y, block[i].y);
+            mincol->y = std::fmin(mincol->y, block[i].y);
+        }
+
+        if ((block[i].z < stdmax.z) && (block[i].z > stdmin.z))
+        {
+            maxcol->z = std::fmax(maxcol->z, block[i].z);
+            mincol->z = std::fmin(mincol->z, block[i].z);
+        }
+    }
+}
+
 #if ASTC_SELECT_DIAG == 1
 /* Optional selection of either current or oposite diagonal - small potential
  * quality improvement at a small runtime cost
@@ -252,7 +299,8 @@ bool select_diagonal(
         cov.y += t.y * t.z;
     }
 
-    // printf("    cov_x: %.5f  cov_y: %.5f\n", cov.x, cov.y);
+    // printf("     cov_x: %8.5f\n", (double)cov.x);
+    // printf("     cov_y: %8.5f\n", (double)cov.y);
 
     if (cov.x < F(0.0)) {
         decimal tmp = maxcol->x;
@@ -365,12 +413,15 @@ void encode_block(
 
     constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
 
+    // printf("=== BLOCK ===\n");
+
     // Convert the block into floating point and determine the line through
     // color space
     Vec3f block_flt[MAX_PIXEL_COUNT];
+#if ASTC_TRIM_ENDPOINTS == 0
+    // Default method, select min/max directly
     Vec3f mincol = { F(1.0), F(1.0), F(1.0) };
     Vec3f maxcol = { F(0.0), F(0.0), F(0.0) };
-
     for (int i = 0; i < pixel_count; ++i)
     {
         block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / F(255.0);
@@ -381,32 +432,39 @@ void encode_block(
         maxcol = max3f(maxcol, block_flt[i]);
     }
     // print_minmax("   ", mincol, maxcol);
+#else
+    // Trimmed method, min/max are selected so they are within avg+=2.0*stddev
+    Vec3f sum = { F(0.0), F(0.0), F(0.0) };
+    Vec3f sq_sum = { F(0.0), F(0.0), F(0.0) };
+    for (int i = 0; i < pixel_count; ++i)
+    {
+        block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / F(255.0);
+        block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / F(255.0);
+        block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / F(255.0);
 
-    // Vec3f sum = { F(0.0), F(0.0), F(0.0) };
-    // Vec3f sq_sum = { F(0.0), F(0.0), F(0.0) };
-    // for (int i = 0; i < pixel_count; ++i)
-    // {
-    //     sum = sum + block_flt[i];
-    //     Vec3f sq = {
-    //         block_flt[i].x * block_flt[i].x,
-    //         block_flt[i].y * block_flt[i].y,
-    //         block_flt[i].z * block_flt[i].z,
-    //     };
-    //     sq_sum = sq_sum + sq;
-    // }
-    // Vec3f avg = sum / (decimal)(pixel_count);
-    // Vec3f var =
-    //     (sq_sum / pixel_count) - Vec3f { avg.x*avg.x, avg.y*avg.y, avg.z*avg.z };
-    // Vec3f std = {
-    //     std::sqrt(var.x),
-    //     std::sqrt(var.y),
-    //     std::sqrt(var.z),
-    // };
+        sum = sum + block_flt[i];
+        Vec3f sq = {
+            block_flt[i].x * block_flt[i].x,
+            block_flt[i].y * block_flt[i].y,
+            block_flt[i].z * block_flt[i].z,
+        };
+        sq_sum = sq_sum + sq;
+    }
 
-    // printf("\n");
-    // printf("avg: %5.3f %5.3f %5.3f  std: %5.3f %5.3f %5.3f\n",
-    //     (double)avg.x, (double)avg.y, (double)avg.z,
-    //     (double)std.x, (double)std.y, (double)std.z);
+    Vec3f avg = sum / (decimal)(pixel_count);
+    Vec3f var =
+        (sq_sum / pixel_count) - Vec3f { avg.x*avg.x, avg.y*avg.y, avg.z*avg.z };
+    Vec3f std = {
+        std::sqrt(var.x),
+        std::sqrt(var.y),
+        std::sqrt(var.z),
+    };
+
+    Vec3f mincol = avg;
+    Vec3f maxcol = avg;
+    find_minmax_trimmed(block_flt, pixel_count, avg, std, &mincol, &maxcol);
+    // print_minmax("m2 ", mincol, maxcol);
+#endif
 
 #if ASTC_SELECT_DIAG == 1
     bool swapped = select_diagonal(block_flt, pixel_count, &mincol, &maxcol);
