@@ -346,7 +346,8 @@ uint8_t quantize_2b(decimal x)
     // effect.
 
     uint8_t quant = u8clamp((uint8_t)(x * F(7.0) + F(0.5)), 0, 7);
-    quant += (x > quant_midpoints_3b[quant]);
+    // uint8_t quant = u8clamp((uint8_t)(x * F(7.0)), 0, 7);
+    // quant += (x > quant_midpoints_3b[quant]);
     quant >>= 1;
 
     assert((quant >= 0) && (quant <= 3));
@@ -369,15 +370,17 @@ Vec3i quantize_5b(Vec3f *vec)
 
     // Ideal rounding yields about 0.002 dB improvement. Otherwise, non-ideal
     // rounding:
-    // int quant_x = iclamp((int)(vec->x * F(31.0) + F(0.5)), 0, 31);
+    int quant_x = iclamp((int)(vec->x * F(31.0) + F(0.5)), 0, 31);
+    int quant_y = iclamp((int)(vec->y * F(31.0) + F(0.5)), 0, 31);
+    int quant_z = iclamp((int)(vec->z * F(31.0) + F(0.5)), 0, 31);
 
-    int quant_x = (int)(vec->x * F(31.0));
-    int quant_y = (int)(vec->y * F(31.0));
-    int quant_z = (int)(vec->z * F(31.0));
+    // int quant_x = (int)(vec->x * F(31.0));
+    // int quant_y = (int)(vec->y * F(31.0));
+    // int quant_z = (int)(vec->z * F(31.0));
 
-    quant_x += (vec->x > quant_midpoints_5b[quant_x]);
-    quant_y += (vec->y > quant_midpoints_5b[quant_y]);
-    quant_z += (vec->z > quant_midpoints_5b[quant_z]);
+    // quant_x += (vec->x > quant_midpoints_5b[quant_x]);
+    // quant_y += (vec->y > quant_midpoints_5b[quant_y]);
+    // quant_z += (vec->z > quant_midpoints_5b[quant_z]);
 
     int dequant_x = (quant_x << 3) | (quant_x >> 2);
     int dequant_y = (quant_y << 3) | (quant_y >> 2);
