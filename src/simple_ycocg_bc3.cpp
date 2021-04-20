@@ -355,9 +355,9 @@ void decode_block(
     palette_y[7] = (F(1.0) * max_y + F(6.0) * min_y) * (F(1.0) / F(7.0));
 
     // Read CoCg palette
-    bc_block_t block_cocg = {
-        .b32 = { enc_block[2], enc_block[3] }
-    };
+    bc_block_t block_cocg;
+    block_cocg.b32[0] = enc_block[2];
+    block_cocg.b32[1] = enc_block[3];
 
     Vec3f palette_cocgscale[4];
     palette_cocgscale[0] = rgb565_to_f32(block_cocg.b16[0]);  // maxcol
