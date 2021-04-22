@@ -545,6 +545,7 @@ void encode_block(
         }
 
         // We downsample the weight grid before quantization
+        // TODO: Investigate possible shift in values
         bilin::downsample(
             ideal_weights,
             block_size_x,
