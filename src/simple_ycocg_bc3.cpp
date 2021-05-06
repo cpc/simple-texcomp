@@ -338,9 +338,9 @@ void decode_block(
     uint8_t out_pixels[NCH_RGB*16]
 ){
     // Read Y palette
-    bc_block_t block_y = {
-        .b32 = { enc_block[0], enc_block[1] }
-    };
+    bc_block_t block_y;
+    block_y.b32[0] = enc_block[0];
+    block_y.b32[1] = enc_block[1];
 
     decimal max_y = (decimal)block_y.b8[0] / F(255.0);
     decimal min_y = (decimal)block_y.b8[1] / F(255.0);
