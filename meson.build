@@ -58,6 +58,7 @@ src_downsampler = [
 ]
 
 src_transcoder = [
+  'src/transcoder_main.cpp',
   'src/transcoder.cpp',
   'src/simple_bilinear.cpp',
   'src/simple_astc.cpp',

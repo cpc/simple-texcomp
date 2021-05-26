@@ -15,33 +15,13 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
+#include "platform.hpp"
+#include "transcoder.hpp"
 #include "simple_texcomp.hpp"
 
 namespace fs = std::filesystem;
-using namespace simple;
 
-/* Possible encoding formats */
-typedef enum enc_format_t {
-    BC1,
-    YCOCG_BC3,
-    ASTC,
-} enc_format_t;
-
-/* Define encoding format here */
-const enc_format_t ENC_FORMAT = ASTC;
-
-/* Exit with error, optionally printing usage */
-void err_exit(const std::string& err_msg, bool print_usage=false)
-{
-    fprintf(stderr, "ERROR: %s\n", err_msg.data());
-    if (print_usage)
-    {
-        fprintf(stderr,
-            "Usage: transcoder input_image [<input_image> ...] output_folder\n"
-        );
-    }
-    exit(1);
-}
+namespace simple {
 
 /* Pad image so that width and height are divisible by 4
  *
@@ -67,7 +47,7 @@ void pad_image(
     pad_w = nblocks_x * block_w;
     pad_h = nblocks_y * block_h;
 
-	padded_img.resize(pad_w * pad_h * NCH_RGB);
+    padded_img.resize(pad_w * pad_h * NCH_RGB);
     for (int i = 0; i < pad_w*pad_h*NCH_RGB; ++i)
     {
         padded_img[i] = 0;
@@ -158,12 +138,12 @@ int encode_image(
         encode_block = astc::encode_block;
         break;
     default:
-        fprintf(stderr, "ERROR: Unsupported encoding format\n");
+        LOGE("Unsupported encoding format\n");
         return 1;
     };
 
-	// Resize the encoded data buffer
-	enc_data.resize(nblocks_x * nblocks_y * block_nints);
+    // Resize the encoded data buffer
+    enc_data.resize(nblocks_x * nblocks_y * block_nints);
 
     // Iterate through blocks and encode them one-by-one (this can be easily
     // parallelized, all blocks are independent to each other)
@@ -225,7 +205,7 @@ int decode_image(
     case ASTC:
         return 0;
     default:
-        fprintf(stderr, "ERROR: Unsupported encoding format\n");
+        LOGE("Unsupported encoding format\n");
         return 1;
     };
 
@@ -263,7 +243,7 @@ void dump_enc_data(
     const std::vector<uint32_t>& enc_data,
     const std::string& filename
 ){
-    printf("-- Saving encoded data to '%s'\n", filename.data());
+    LOGI("-- Saving encoded data to '%s'\n", filename.data());
     std::ofstream wf(filename);
     for (const uint32_t& x : enc_data)
     {
@@ -283,41 +263,45 @@ double get_time()
     return (double)tv.tv_sec + (double)tv.tv_usec * (double)1.0e-6;
 }
 
-int main(int argc, char **argv)
-{
+int transcoder_entry(
+    std::vector<std::string> inp_images,
+    std::string out_dir
+){
     // Check command line arguments
-    if (argc < 3)
-    {
-        err_exit("Provide at least one image and an output folder", true);
-    }
+    // if (argc < 3)
+    // {
+    //     err_exit("Provide at least one image and an output folder", true);
+    // }
 
-    // Last argument is the output directory
-    std::string out_dir = argv[argc-1];
-    printf("Output directory: '%s'\n", out_dir.data());
-    if ( !(fs::is_directory(out_dir) && fs::exists(out_dir)) )
-    {
-        err_exit("Can't open output directory", true);
-    }
+    // // Last argument is the output directory
+    // std::string out_dir = argv[argc-1];
+    LOGI("Output directory: '%s'\n", out_dir.data());
+    // if ( !(fs::is_directory(out_dir) && fs::exists(out_dir)) )
+    // {
+    //     err_exit("Can't open output directory", true);
+    // }
 
     // Init & print out format-specific info
     if (ENC_FORMAT == ASTC)
     {
         astc::init_astc(12, 12, 8, 5);
-        printf("WARNING: ASTC format decoding is not supported. Instead,"
+        LOGI("WARNING: ASTC format decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
                " directory.\n");
     }
 
     if (ENC_FORMAT == BC1)
     {
-        printf("INFO: BC1 is compiled with BC1_SELECT_DIAG=%d\n", BC1_SELECT_DIAG);
+        LOGI("BC1 is compiled with BC1_SELECT_DIAG=%d\n", BC1_SELECT_DIAG);
     }
 
     if (ENC_FORMAT == ASTC)
     {
-        printf("INFO: ASTC is compiled with ASTC_SELECT_DIAG=%d\n", ASTC_SELECT_DIAG);
-        printf("INFO: ASTC is compiled with ASTC_TRIM_ENDPOINTS=%d\n", ASTC_TRIM_ENDPOINTS);
+        LOGI("ASTC is compiled with ASTC_SELECT_DIAG=%d\n", ASTC_SELECT_DIAG);
+        LOGI("ASTC is compiled with ASTC_TRIM_ENDPOINTS=%d\n", ASTC_TRIM_ENDPOINTS);
     }
+
+    LOGI("\n");
 
     // Error code
     int err = 0;
@@ -328,12 +312,14 @@ int main(int argc, char **argv)
     int num_enc_images = 0;
 
     // Loop through images one by one
-    for (int i = 1; i < argc-1; ++i)
+    // for (int i = 1; i < argc-1; ++i)
+    int i = 1;
+    for (auto inp_name : inp_images)
     {
         double start_time = get_time();
 
-        std::string inp_name = argv[i];
-        printf("Image %d/%d: %s\n", i, argc-2, inp_name.data());
+        // std::string inp_name = argv[i];
+        LOGI("Image %d/%ld: %s\n", i, inp_images.size(), inp_name.data());
 
         // Read input image
         int inp_w, inp_h, nch;
@@ -346,7 +332,7 @@ int main(int argc, char **argv)
         );
         if (inp_pixels == NULL)
         {
-            printf("-- Error opening file, skipping\n");
+            LOGI("-- Error opening file, skipping\n");
             err = 1;
             continue;
         }
@@ -359,7 +345,7 @@ int main(int argc, char **argv)
 
         if ( (inp_w != pad_w) || (inp_h != pad_h) )
         {
-            printf("-- Image size %dx%d, after padding %dx%d\n", inp_w, inp_h, pad_w, pad_h);
+            LOGI("-- Image size %dx%d, after padding %dx%d\n", inp_w, inp_h, pad_w, pad_h);
         }
 
         double enc_start_time = get_time();
@@ -368,7 +354,7 @@ int main(int argc, char **argv)
         std::vector<uint32_t> enc_data;
         if (encode_image(padded_img.data(), pad_w, pad_h, enc_data))
         {
-            printf("-- Error encoding image\n");
+            LOGI("-- Error encoding image\n");
             stbi_image_free(inp_pixels);
             continue;
         }
@@ -386,7 +372,7 @@ int main(int argc, char **argv)
         std::vector<uint8_t> dec_image(pad_w*pad_h*NCH_RGB);
         if (decode_image(enc_data, pad_w, pad_h, dec_image))
         {
-            printf("-- Error decoding image\n");
+            LOGI("-- Error decoding image\n");
             stbi_image_free(inp_pixels);
             continue;
         }
@@ -396,7 +382,7 @@ int main(int argc, char **argv)
         {
             std::string out_name = out_dir
                 / fs::path(inp_name).filename().replace_extension(".astc");
-            printf("-- Saving encoded image to '%s'\n", out_name.data());
+            LOGI("-- Saving encoded image to '%s'\n", out_name.data());
             int ret = astc::store_astc_image(
                 (uint8_t*)enc_data.data(),
                 4*enc_data.size(),
@@ -406,7 +392,7 @@ int main(int argc, char **argv)
             );
             if (ret != 0)
             {
-                printf("-- Error saving .astc file\n");
+                LOGI("-- Error saving .astc file\n");
                 stbi_image_free(inp_pixels);
                 continue;
             }
@@ -419,7 +405,7 @@ int main(int argc, char **argv)
 
             std::string out_name = out_dir
                 / fs::path(inp_name).filename().replace_extension(".png");
-            printf("-- Saving decoded image to '%s'\n", out_name.data());
+            LOGI("-- Saving decoded image to '%s'\n", out_name.data());
             int ret = stbi_write_png(
                 out_name.data(),
                 inp_w,
@@ -430,20 +416,25 @@ int main(int argc, char **argv)
             );
             if (ret == 0)
             {
-                err_exit("Can't save output image");
+                // err_exit("Can't save output image");
+                LOGE("Can't save output image\n");
+                return 1;
             }
         }
 
         stbi_image_free(inp_pixels);
 
         total_duration += ( get_time() - start_time );
+        i += 1;
     }
 
-    printf("\n");
-    printf("Encoded images                : %9d\n", num_enc_images);
-    printf("Average encoding time (sec)   : %9.5f\n", total_enc_duration / num_enc_images);
-    printf("Average encoding rate (Mpx/s) : %9.5f\n", total_num_enc_pixels / total_enc_duration / (double)1e6);
-    printf("Average total time (sec)      : %9.5f\n", total_duration / num_enc_images);
+    LOGI("\n");
+    LOGI("Encoded images                : %9d\n", num_enc_images);
+    LOGI("Average encoding time (sec)   : %9.5f\n", total_enc_duration / num_enc_images);
+    LOGI("Average encoding rate (Mpx/s) : %9.5f\n", total_num_enc_pixels / total_enc_duration / (double)1e6);
+    LOGI("Average total time (sec)      : %9.5f\n", total_duration / num_enc_images);
 
     return err;
 }
+
+} // namespace simple

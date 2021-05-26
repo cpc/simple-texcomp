@@ -5,9 +5,6 @@
 
 namespace simple {
 
-/* Number of channels if a RGB pixel. Used for calculating data sizes */
-constexpr int NCH_RGB  = 3;
-
 /* Compile-time switch between float and double for the calculations
  *
  * EPSILON is used for comparing floating point numbers
@@ -21,6 +18,9 @@ const decimal EPSILON = 1e-12;
 typedef float decimal;
 const decimal EPSILON = 1e-6f;
 #endif
+
+/* Number of channels if a RGB pixel. Used for calculating data sizes */
+constexpr int NCH_RGB  = 3;
 
 /******************************************************************************
  * ASTC
@@ -184,6 +184,6 @@ namespace bilin {
 
 }
 
-} // namespace
+} // namespace simple
 
 #endif // SIMPLE_TEXCOMP_HPP
