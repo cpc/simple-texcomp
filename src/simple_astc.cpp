@@ -2,6 +2,7 @@
 #include <cassert>
 #include <fstream>
 
+#include "platform.hpp"
 #include "simple_mathlib.hpp"
 #include "simple_texcomp.hpp"
 
@@ -62,15 +63,15 @@ int store_astc_image(
  	std::ofstream file(filename, std::ios::out | std::ios::binary);
 	if (!file)
 	{
-		printf("ERROR: File open failed '%s'\n", filename);
+		LOGE("ERROR: File open failed '%s'\n", filename);
 		return 1;
 	}
 
-    // printf("Saving to %s, %zu bytes\n", filename, data_len);
+    // LOGE("Saving to %s, %zu bytes\n", filename, data_len);
     // char* tmp = (char*)data;
     // for (size_t i = 0; i < data_len; ++i)
     // {
-    //     printf("%3d\n", tmp[i]);
+    //     LOGE("%3d\n", tmp[i]);
     // }
 
 	file.write((char*)&header, sizeof(astc_header));
