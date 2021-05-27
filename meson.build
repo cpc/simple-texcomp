@@ -51,6 +51,7 @@ vector_args = [ '-march=native' ]
 
 includes = include_directories('src')
 stb_includes = include_directories('extern/stb', is_system: true)
+ghc_includes = include_directories('extern/ghc', is_system: true)
 
 src_downsampler = [
   'src/simple_bilinear.cpp',
@@ -69,20 +70,20 @@ src_transcoder = [
 executable(
   'downsampler',
   src_downsampler,
-  include_directories: [ includes, stb_includes ],
+  include_directories: [ includes, stb_includes, ghc_includes ],
   cpp_args: vector_args,
 )
 
 executable(
   'transcoder',
   src_transcoder,
-  include_directories: [ includes, stb_includes ],
+  include_directories: [ includes, stb_includes, ghc_includes ],
   cpp_args: vector_args,
 )
 
 executable(
   'transcoder-scalar',
   src_transcoder,
-  include_directories: [ includes, stb_includes ],
+  include_directories: [ includes, stb_includes, ghc_includes ],
   cpp_args: scalar_args,
 )

@@ -5,7 +5,6 @@
 
 #include <sys/time.h>
 
-#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -19,7 +18,9 @@
 #include "transcoder.hpp"
 #include "simple_texcomp.hpp"
 
-namespace fs = std::filesystem;
+// #include <filesystem>
+#include <filesystem.hpp>
+namespace fs = ghc::filesystem;
 
 namespace simple {
 
