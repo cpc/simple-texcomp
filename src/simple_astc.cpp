@@ -6,6 +6,8 @@
 #include "simple_mathlib.hpp"
 #include "simple_texcomp.hpp"
 
+#include <Tracy.hpp>
+
 namespace simple::astc {
 
 /**
@@ -401,6 +403,8 @@ void encode_block(
     const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
     uint32_t out[4]
 ){
+    ZoneScopedN("enc_blk_astc");
+
     const uint16_t block_mode = 102;
     const uint8_t wgt_grid_w = 8;
     const uint8_t wgt_grid_h = 5;

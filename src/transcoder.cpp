@@ -113,6 +113,8 @@ int encode_image(
     int img_h,
     std::vector<uint32_t>& enc_data
 ){
+    ZoneScopedN("enc_img");
+
     // Input block size
     const int block_w = (ENC_FORMAT == ASTC) ? astc::BLOCK_X : 4;
     const int block_h = (ENC_FORMAT == ASTC) ? astc::BLOCK_Y : 4;
@@ -154,6 +156,8 @@ int encode_image(
     {
         for (int block_x = 0; block_x < nblocks_x; ++block_x)
         {
+            ZoneScopedN("loop_blk");
+
             // Read 4x4 block of pixels into an array
             uint8_t block_pixels[NCH_RGB*block_w*block_h];
             const int x = block_x * block_w;
@@ -306,6 +310,8 @@ int transcoder_entry(
     int i = 1;
     for (auto inp_name : inp_images)
     {
+        FrameMarkStart("img");
+
         double start_time = get_time();
 
         LOGI("Image %d/%ld: %s\n", i, inp_images.size(), inp_name.data());
@@ -341,6 +347,7 @@ int transcoder_entry(
 
         // Encode it into enc_data
         std::vector<uint32_t> enc_data;
+
         if (encode_image(padded_img.data(), pad_w, pad_h, enc_data))
         {
             LOGI("-- Error encoding image\n");
@@ -416,7 +423,7 @@ int transcoder_entry(
         total_duration += ( get_time() - start_time );
         i += 1;
 
-        FrameMark;
+        FrameMarkEnd("img");
     }
 
     LOGI("\n");
