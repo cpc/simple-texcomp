@@ -46,12 +46,22 @@ if get_option('fast_math')
   add_project_arguments('-ffast-math', language: 'cpp')
 endif
 
+tracy_deps = [ ]
+if get_option('tracy_enable')
+  add_project_arguments('-DTRACY_ENABLE', language: 'cpp')
+  compiler = meson.get_compiler('cpp')
+  libdl = compiler.find_library('dl', required: true)
+  libpthread = compiler.find_library('pthread', required: true)
+  tracy_deps = [ libdl, libpthread ]
+endif
+
 scalar_args = [ '-fno-slp-vectorize', '-fno-vectorize',  '-fno-tree-vectorize', ]
 vector_args = [ '-march=native' ]
 
 includes = include_directories('src')
 stb_includes = include_directories('extern/stb', is_system: true)
 ghc_includes = include_directories('extern/ghc', is_system: true)
+tracy_includes = include_directories('extern/tracy', is_system: true)
 
 src_downsampler = [
   'src/simple_bilinear.cpp',
@@ -65,25 +75,29 @@ src_transcoder = [
   'src/simple_astc.cpp',
   'src/simple_bc1.cpp',
   'src/simple_ycocg_bc3.cpp',
+  'extern/tracy/TracyClient.cpp',
 ]
 
 executable(
   'downsampler',
   src_downsampler,
-  include_directories: [ includes, stb_includes, ghc_includes ],
+  include_directories: [ includes, stb_includes, ghc_includes, tracy_includes ],
   cpp_args: vector_args,
+  dependencies: tracy_deps,
 )
 
 executable(
   'transcoder',
   src_transcoder,
-  include_directories: [ includes, stb_includes, ghc_includes ],
+  include_directories: [ includes, stb_includes, ghc_includes, tracy_includes ],
   cpp_args: vector_args,
+  dependencies: tracy_deps,
 )
 
 executable(
   'transcoder-scalar',
   src_transcoder,
-  include_directories: [ includes, stb_includes, ghc_includes ],
+  include_directories: [ includes, stb_includes, ghc_includes, tracy_includes ],
   cpp_args: scalar_args,
+  dependencies: tracy_deps,
 )

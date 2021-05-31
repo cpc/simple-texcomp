@@ -22,6 +22,8 @@
 #include <filesystem.hpp>
 namespace fs = ghc::filesystem;
 
+#include <Tracy.hpp>
+
 namespace simple {
 
 /* Pad image so that width and height are divisible by 4
@@ -268,19 +270,7 @@ int transcoder_entry(
     std::vector<std::string> inp_images,
     std::string out_dir
 ){
-    // Check command line arguments
-    // if (argc < 3)
-    // {
-    //     err_exit("Provide at least one image and an output folder", true);
-    // }
-
-    // // Last argument is the output directory
-    // std::string out_dir = argv[argc-1];
     LOGI("Output directory: '%s'\n", out_dir.data());
-    // if ( !(fs::is_directory(out_dir) && fs::exists(out_dir)) )
-    // {
-    //     err_exit("Can't open output directory", true);
-    // }
 
     // Init & print out format-specific info
     if (ENC_FORMAT == ASTC)
@@ -313,13 +303,11 @@ int transcoder_entry(
     int num_enc_images = 0;
 
     // Loop through images one by one
-    // for (int i = 1; i < argc-1; ++i)
     int i = 1;
     for (auto inp_name : inp_images)
     {
         double start_time = get_time();
 
-        // std::string inp_name = argv[i];
         LOGI("Image %d/%ld: %s\n", i, inp_images.size(), inp_name.data());
 
         // Read input image
@@ -427,6 +415,8 @@ int transcoder_entry(
 
         total_duration += ( get_time() - start_time );
         i += 1;
+
+        FrameMark;
     }
 
     LOGI("\n");

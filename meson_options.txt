@@ -32,3 +32,10 @@ option(
   value: true,
   description: 'Enable fast math.',
 )
+
+option(
+  'tracy_enable',
+  type: 'boolean',
+  value: false,
+  description: 'Enable Tracy profiling.',
+)
