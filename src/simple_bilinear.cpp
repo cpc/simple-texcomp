@@ -4,6 +4,8 @@
 
 #include "simple_texcomp.hpp"
 
+#include <Tracy.hpp>
+
 namespace simple::bilin {
 
 /** Test if two floating point numbers are almost equal */
@@ -131,6 +133,8 @@ void downsample(
     int w_out,
     int h_out
 ){
+    ZoneScopedN("bilin");
+
     // Buffer for holding intermediate results
     static decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
 

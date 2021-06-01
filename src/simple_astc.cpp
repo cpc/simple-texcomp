@@ -245,6 +245,7 @@ void find_minmax_trimmed(
     Vec3f *mincol,
     Vec3f *maxcol
 ){
+    ZoneScopedN("minmax_tr");
     // Vec3f avg2 = avg * F(255.0);
     // Vec3f std2 = std * F(255.0);
     // printf("       avg: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
@@ -292,6 +293,8 @@ bool select_diagonal(
     Vec3f *mincol,
     Vec3f *maxcol
 ){
+    ZoneScopedN("sel_diag");
+
     bool swapped = false;
     Vec3f center = (*mincol + *maxcol) * F(0.5);
 
@@ -430,14 +433,16 @@ void encode_block(
     // Default method, select min/max directly
     Vec3f mincol = { F(1.0), F(1.0), F(1.0) };
     Vec3f maxcol = { F(0.0), F(0.0), F(0.0) };
-    for (int i = 0; i < pixel_count; ++i)
     {
-        block_flt[i].x = (decimal)block_pixels[NCH_RGB*i] / F(255.0);
-        block_flt[i].y = (decimal)block_pixels[NCH_RGB*i+1] / F(255.0);
-        block_flt[i].z = (decimal)block_pixels[NCH_RGB*i+2] / F(255.0);
+        ZoneScopedN("minmax");
+        for (int i = 0; i < pixel_count; ++i) {
+            block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(255.0);
+            block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(255.0);
+            block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(255.0);
 
-        mincol = min3f(mincol, block_flt[i]);
-        maxcol = max3f(maxcol, block_flt[i]);
+            mincol = min3f(mincol, block_flt[i]);
+            maxcol = max3f(maxcol, block_flt[i]);
+        }
     }
     // print_minmax("   ", mincol, maxcol);
 #else

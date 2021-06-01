@@ -276,11 +276,19 @@ int transcoder_entry(
 ){
     LOGI("Output directory: '%s'\n", out_dir.data());
 
+#ifdef ANDROID
+    LOGI("Android build");
+#ifdef __ARM_FEATURE_SVE
+    LOGI("SVE supported");
+#endif // __ARM_FEATURE_SVE
+    LOGI("SVE not supported");
+#endif // ANDROID
+
     // Init & print out format-specific info
     if (ENC_FORMAT == ASTC)
     {
         astc::init_astc(12, 12, 8, 5);
-        LOGI("WARNING: ASTC format decoding is not supported. Instead,"
+        LOGI("WARNING: ASTC decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
                " directory.\n");
     }
