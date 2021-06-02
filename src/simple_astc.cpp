@@ -265,20 +265,20 @@ void find_minmax_trimmed(
     {
         if ((block[i].x < stdmax.x) && (block[i].x > stdmin.x))
         {
-            maxcol->x = std::fmax(maxcol->x, block[i].x);
-            mincol->x = std::fmin(mincol->x, block[i].x);
+            maxcol->x = fmax(maxcol->x, block[i].x);
+            mincol->x = fmin(mincol->x, block[i].x);
         }
 
         if ((block[i].y < stdmax.y) && (block[i].y > stdmin.y))
         {
-            maxcol->y = std::fmax(maxcol->y, block[i].y);
-            mincol->y = std::fmin(mincol->y, block[i].y);
+            maxcol->y = fmax(maxcol->y, block[i].y);
+            mincol->y = fmin(mincol->y, block[i].y);
         }
 
         if ((block[i].z < stdmax.z) && (block[i].z > stdmin.z))
         {
-            maxcol->z = std::fmax(maxcol->z, block[i].z);
-            mincol->z = std::fmin(mincol->z, block[i].z);
+            maxcol->z = fmax(maxcol->z, block[i].z);
+            mincol->z = fmin(mincol->z, block[i].z);
         }
     }
 }

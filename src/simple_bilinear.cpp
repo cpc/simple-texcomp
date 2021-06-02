@@ -3,15 +3,24 @@
 #include <cmath>
 
 #include "simple_texcomp.hpp"
+#include "simple_mathlib.hpp"
 
 #include <Tracy.hpp>
 
 namespace simple::bilin {
 
+/* Minimum representable positive floating point number*/
+#if FLOAT_PRECISION < 32
+// _Float16 is not in std
+static constexpr decimal FLT_MINVAL = 0.000000059604645f16;
+#else
+static constexpr decimal FLT_MINVAL = std::numeric_limits<decimal>::min();
+#endif // FLAOT_PRECISION < 32
+
 /** Test if two floating point numbers are almost equal */
 static inline bool is_close_enough(decimal a, decimal b)
 {
-    return ( std::fabs(a - b) <= EPSILON );
+    return ( fabs(a - b) <= EPSILON );
 }
 
 /** Calculate "tent" function, i.e., piece-wise linear interpolation
@@ -144,7 +153,7 @@ void downsample(
         for (int m = 0; m < w_out; ++m)
         {
             uint8_t pixel_count = bw->bilin_pixel_count_x[m];
-            decimal weight_sum = std::numeric_limits<decimal>::min();  // prevent division by 0
+            decimal weight_sum = FLT_MINVAL;  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t x = 0; x < pixel_count; ++x)
             {
@@ -167,7 +176,7 @@ void downsample(
         for (int n = 0; n < h_out; ++n)
         {
             uint8_t pixel_count = bw->bilin_pixel_count_y[n];
-            decimal weight_sum = std::numeric_limits<decimal>::min();  // prevent division by 0
+            decimal weight_sum = FLT_MINVAL;  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t y = 0; y < pixel_count; ++y)
             {

@@ -7,7 +7,6 @@
 #include<cassert>
 #include<cstdint>
 #include<cstdio>
-#include<cmath>
 
 #include "simple_texcomp.hpp"
 
@@ -249,9 +248,20 @@ inline Vec2f clamp2f(const Vec2f &a, decimal amin, decimal amax)
     };
 }
 
+inline decimal fabs(decimal a)
+{
+    if (a < 0) {
+        return -a;
+    }
+    else
+    {
+        return a;
+    }
+}
+
 inline Vec2f abs2f(const Vec2f &a)
 {
-    return Vec2f { (decimal)std::fabs(a.x), (decimal)std::fabs(a.y) };
+    return Vec2f { (decimal)fabs(a.x), (decimal)fabs(a.y) };
 }
 
 /* Compute squared distance of two vectors */
@@ -267,6 +277,12 @@ inline decimal distsq2f(const Vec2f &a, const Vec2f &b)
     return diff.dot(diff);
 }
 
+/* Round floating point number and return it as unsigned integer */
+inline uint32_t froundu(decimal a)
+{
+    return (uint32_t)(a + F(0.5));
 }
+
+}  // namespace simple
 
 #endif // SIMPLE_MATHLIB_HPP

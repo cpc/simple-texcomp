@@ -54,9 +54,9 @@ Vec3f rgb565_to_f32(uint16_t color)
 /* Convert a floating-point color into the RGB565 format */
 uint32_t f32_to_rgb565(Vec3f *color)
 {
-    uint32_t r = (uint32_t)std::round(color->x * F(31.0));
-    uint32_t g = (uint32_t)std::round(color->y * F(63.0));
-    uint32_t b = (uint32_t)std::round(color->z * F(31.0));
+    uint32_t r = froundu(color->x * F(31.0));
+    uint32_t g = froundu(color->y * F(63.0));
+    uint32_t b = froundu(color->z * F(31.0));
 
     uint32_t out = (r << 11) | (g << 5) | b;
 
