@@ -280,6 +280,14 @@ int transcoder_entry(
     LOGI("Android build");
 #endif // ANDROID
 
+#if FLOAT_PRECISION == 64
+    LOGI("Floating point precision: double");
+#elif FLOAT_PRECISION == 16
+    LOGI("Floating point precision: half");
+#else
+    LOGI("Floating point precision: float");
+#endif
+
     // Init & print out format-specific info
     if (ENC_FORMAT == ASTC)
     {

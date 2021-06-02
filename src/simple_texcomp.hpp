@@ -9,14 +9,18 @@ namespace simple {
  *
  * EPSILON is used for comparing floating point numbers
  */
-#if USE_DOUBLE == 1
-#define F(x) (x)     // do not append f to decimal literals
+#if FLOAT_PRECISION == 64
+#define F(x) (x)
 typedef double decimal;
-const decimal EPSILON = 1e-12;
+constexpr decimal EPSILON = 1e-12;
+#elif FLOAT_PRECISION == 16
+#define F(x) (x##f16)
+typedef _Float16 decimal;
+constexpr decimal EPSILON = 1e-6f16;
 #else
-#define F(x) (x##f)  // append f to decimal literals
+#define F(x) (x##f)
 typedef float decimal;
-const decimal EPSILON = 1e-6f;
+constexpr decimal EPSILON = 1e-6f;
 #endif
 
 /* Number of channels if a RGB pixel. Used for calculating data sizes */

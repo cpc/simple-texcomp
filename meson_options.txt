@@ -20,10 +20,10 @@ option(
 )
 
 option(
-  'use_double',
-  type: 'boolean',
-  value: true,
-  description: 'Use double in calculations or set it to false to use float.',
+  'float_precision',
+  type : 'combo',
+  choices : ['double', 'float', 'half'],
+  value : 'float'
 )
 
 option(

@@ -36,10 +36,13 @@ else
   add_project_arguments('-DASTC_TRIM_ENDPOINTS=0', language: 'cpp')
 endif
 
-if get_option('use_double')
-  add_project_arguments('-DUSE_DOUBLE=1', language: 'cpp')
+float_precision = get_option('float_precision')
+if float_precision == 'double'
+  add_project_arguments('-DFLOAT_PRECISION=64', language: 'cpp')
+elif float_precision == 'half'
+  add_project_arguments('-DFLOAT_PRECISION=16', language: 'cpp')
 else
-  add_project_arguments('-DUSE_DOUBLE=0', language: 'cpp')
+  add_project_arguments('-DFLOAT_PRECISION=32', language: 'cpp')
 endif
 
 if get_option('fast_math')
