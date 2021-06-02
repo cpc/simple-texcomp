@@ -66,6 +66,7 @@ tracy_includes = include_directories('extern/tracy', is_system: true)
 src_downsampler = [
   'src/simple_bilinear.cpp',
   'src/utils/downsampler.cpp',
+  'extern/tracy/TracyClient.cpp',
 ]
 
 src_transcoder = [
