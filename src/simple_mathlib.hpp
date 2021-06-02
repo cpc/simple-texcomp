@@ -183,21 +183,43 @@ inline uint8_t u8clamp(uint8_t a, uint8_t amin, uint8_t amax)
     return min > amax ? amax : min;
 }
 
+inline decimal fmin(decimal a, decimal b)
+{
+    if (a < b)
+    {
+        return a;
+    } else
+    {
+        return b;
+    }
+}
+
+inline decimal fmax(decimal a, decimal b)
+{
+    if (a > b)
+    {
+        return a;
+    } else
+    {
+        return b;
+    }
+}
+
 inline Vec3f min3f(const Vec3f &a, const Vec3f &b)
 {
     return Vec3f {
-        (decimal)std::fmin(a.x, b.x),
-        (decimal)std::fmin(a.y, b.y),
-        (decimal)std::fmin(a.z, b.z),
+        (decimal)fmin(a.x, b.x),
+        (decimal)fmin(a.y, b.y),
+        (decimal)fmin(a.z, b.z),
     };
 }
 
 inline Vec3f max3f(const Vec3f &a, const Vec3f &b)
 {
     return Vec3f {
-        (decimal)std::fmax(a.x, b.x),
-        (decimal)std::fmax(a.y, b.y),
-        (decimal)std::fmax(a.z, b.z),
+        (decimal)fmax(a.x, b.x),
+        (decimal)fmax(a.y, b.y),
+        (decimal)fmax(a.z, b.z),
     };
 }
 

@@ -418,9 +418,9 @@ void encode_block(
     // const uint8_t wgt_quant_mode = 2;      // range 4
     const uint8_t wgt_bits = 2;
 
-    const uint8_t block_size_x = 12;
-    const uint8_t block_size_y = 12;
-    const uint8_t pixel_count = block_size_x * block_size_y;
+    constexpr uint8_t block_size_x = 12;
+    constexpr uint8_t block_size_y = 12;
+    constexpr uint8_t pixel_count = block_size_x * block_size_y;
 
     constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
 
@@ -431,8 +431,9 @@ void encode_block(
     Vec3f block_flt[MAX_PIXEL_COUNT];
 #if ASTC_TRIM_ENDPOINTS == 0
     // Default method, select min/max directly
-    Vec3f mincol = { F(1.0), F(1.0), F(1.0) };
-    Vec3f maxcol = { F(0.0), F(0.0), F(0.0) };
+    // using tmp values to allow vectorization
+    decimal tmp_min[3] = { F(0.0), F(0.0), F(0.0) };
+    decimal tmp_max[3] = { F(0.0), F(0.0), F(0.0) };
     {
         ZoneScopedN("minmax");
         for (int i = 0; i < pixel_count; ++i) {
@@ -440,10 +441,16 @@ void encode_block(
             block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(255.0);
             block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(255.0);
 
-            mincol = min3f(mincol, block_flt[i]);
-            maxcol = max3f(maxcol, block_flt[i]);
+            tmp_min[0] = fmin(tmp_min[0], block_flt[i].x);
+            tmp_min[1] = fmin(tmp_min[1], block_flt[i].y);
+            tmp_min[2] = fmin(tmp_min[2], block_flt[i].z);
+            tmp_max[0] = fmax(tmp_min[0], block_flt[i].x);
+            tmp_max[1] = fmax(tmp_min[1], block_flt[i].y);
+            tmp_max[2] = fmax(tmp_min[2], block_flt[i].z);
         }
     }
+    Vec3f mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
+    Vec3f maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
     // print_minmax("   ", mincol, maxcol);
 #else
     // Trimmed method, min/max are selected so they are within avg+=2.0*stddev

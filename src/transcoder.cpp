@@ -278,10 +278,6 @@ int transcoder_entry(
 
 #ifdef ANDROID
     LOGI("Android build");
-#ifdef __ARM_FEATURE_SVE
-    LOGI("SVE supported");
-#endif // __ARM_FEATURE_SVE
-    LOGI("SVE not supported");
 #endif // ANDROID
 
     // Init & print out format-specific info
