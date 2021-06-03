@@ -436,6 +436,12 @@ void encode_block(
     decimal tmp_max[3] = { F(0.0), F(0.0), F(0.0) };
     {
         ZoneScopedN("minmax");
+#ifdef ANDROID
+//        #pragma clang loop interleave(disable)
+//        #pragma clang loop unroll(disable)
+        #pragma clang loop vectorize_width(4, scalable)
+        #pragma clang loop interleave_count(2)
+#endif
         for (int i = 0; i < pixel_count; ++i) {
             block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(255.0);
             block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(255.0);
