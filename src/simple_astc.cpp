@@ -432,7 +432,7 @@ void encode_block(
 #if ASTC_TRIM_ENDPOINTS == 0
     // Default method, select min/max directly
     // using tmp values to allow vectorization
-    decimal tmp_min[3] = { F(0.0), F(0.0), F(0.0) };
+    decimal tmp_min[3] = { F(1.0), F(1.0), F(1.0) };
     decimal tmp_max[3] = { F(0.0), F(0.0), F(0.0) };
     {
         ZoneScopedN("minmax");
@@ -444,9 +444,9 @@ void encode_block(
             tmp_min[0] = fmin(tmp_min[0], block_flt[i].x);
             tmp_min[1] = fmin(tmp_min[1], block_flt[i].y);
             tmp_min[2] = fmin(tmp_min[2], block_flt[i].z);
-            tmp_max[0] = fmax(tmp_min[0], block_flt[i].x);
-            tmp_max[1] = fmax(tmp_min[1], block_flt[i].y);
-            tmp_max[2] = fmax(tmp_min[2], block_flt[i].z);
+            tmp_max[0] = fmax(tmp_max[0], block_flt[i].x);
+            tmp_max[1] = fmax(tmp_max[1], block_flt[i].y);
+            tmp_max[2] = fmax(tmp_max[2], block_flt[i].z);
         }
     }
     Vec3f mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
