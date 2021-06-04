@@ -171,10 +171,10 @@ int main(int argc, char **argv)
 
     std::vector<decimal> out_pixels_flt(M*N*nch);
 
-    downsample(
+    bilin::downsample(
         inp_pixels_flt.data(),
         inp_w, inp_h,
-        &bw,
+        // &bw,
         out_pixels_flt.data(),
         M, N
     );

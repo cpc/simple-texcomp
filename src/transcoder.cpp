@@ -290,7 +290,7 @@ int transcoder_entry(
     // Init & print out format-specific info
     if (ENC_FORMAT == ASTC)
     {
-        astc::init_astc(12, 12, 8, 5);
+        // astc::init_astc(12, 12, 8, 5);
         LOGI("WARNING: ASTC decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
                " directory.\n");

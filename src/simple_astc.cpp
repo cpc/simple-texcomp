@@ -127,24 +127,24 @@ void init_tables() {
 }
 
 /* Pre-computed bilinear filter weights */
-bilin::bilinear_weights bilin_weights;
+// bilin::bilinear_weights bilin_weights;
 
-int init_astc(
-    int block_size_x,
-    int block_size_y,
-    int weight_grid_x,
-    int weight_grid_y
-){
-    // init_tables();
-    int ret = populate_bilinear_weights(
-        block_size_x,
-        block_size_y,
-        &bilin_weights,
-        weight_grid_x,
-        weight_grid_y
-    );
-    return ret;
-}
+// int init_astc(
+//     int block_size_x,
+//     int block_size_y,
+//     int weight_grid_x,
+//     int weight_grid_y
+// ){
+//     // init_tables();
+//     int ret = populate_bilinear_weights(
+//         block_size_x,
+//         block_size_y,
+//         &bilin_weights,
+//         weight_grid_x,
+//         weight_grid_y
+//     );
+//     return ret;
+// }
 
 // Taken from astcenc:
 // routine to write up to 8 bits
@@ -550,7 +550,7 @@ void encode_block(
             ideal_weights,
             block_size_x,
             block_size_y,
-            &bilin_weights,
+            // &bilin_weights,
             downsampled_weights,
             wgt_grid_w,
             wgt_grid_h

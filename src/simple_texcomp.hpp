@@ -74,12 +74,12 @@ namespace astc {
     );
 
     /* Initialize ASTC-specific stuff */
-    int init_astc(
-        int block_size_x,
-        int block_size_y,
-        int weight_grid_x,
-        int weight_grid_y
-    );
+    // int init_astc(
+    //     int block_size_x,
+    //     int block_size_y,
+    //     int weight_grid_x,
+    //     int weight_grid_y
+    // );
 
     /* Encode a block of pixels into the ASTC format */
     void encode_block(
@@ -180,7 +180,7 @@ namespace bilin {
         const decimal* inp,  // input values
         int w_inp,           // width of the input block (X)
         int h_inp,           // height of the input block (Y)
-        const bilinear_weights* bw, // table with pre-computed filter weights
+        // const bilinear_weights* bw, // table with pre-computed filter weights
         decimal* out,        // output values
         int w_out,           // width of the output block (M; M <= X)
         int h_out            // height of the output block (N; N <= Y)

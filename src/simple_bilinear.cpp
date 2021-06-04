@@ -16,6 +16,158 @@ static constexpr decimal FLT_MINVAL = 0.000000059604645f16;
 static constexpr decimal FLT_MINVAL = std::numeric_limits<decimal>::min();
 #endif // FLAOT_PRECISION < 32
 
+static constexpr bilinear_weights BILIN_WEIGHTS_8x5 = {
+    { 2,  3,  3,  3,  3,  3,  3,  2,  0,  0,  0,  0, }, // bilin_pixel_count_x
+    { 3,  5,  6,  5,  3,  0,  0,  0,  0,  0,  0,  0, }, // bilin_pixel_count_y
+    {
+        {  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  1,  2,  3,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  2,  3,  4,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  4,  5,  6,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  5,  6,  7,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  7,  8,  9,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  8,  9, 10,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        { 10, 11,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+    }, // bilin_idx_x
+    {
+        {  0,  1,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  1,  2,  3,  4,  5,  0,  0,  0,  0,  0,  0,  0, },
+        {  3,  4,  5,  6,  7,  8,  0,  0,  0,  0,  0,  0, },
+        {  6,  7,  8,  9, 10,  0,  0,  0,  0,  0,  0,  0, },
+        {  9, 10, 11,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, },
+    }, // bilin_idx_y
+    {
+        {
+            1.00000, 0.36364, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.63636, 0.72727, 0.09091, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.27273, 0.90909, 0.45455, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.54545, 0.81818, 0.18182, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.18182, 0.81818, 0.54545, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.45455, 0.90909, 0.27273, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.09091, 0.72727, 0.63636, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.36364, 1.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+    }, // bilin_weights_x
+    {
+        {
+            1.00000, 0.63636, 0.27273, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.36364, 0.72727, 0.90909, 0.54545, 0.18182, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.09091, 0.45455, 0.81818, 0.81818, 0.45455, 0.09091,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.18182, 0.54545, 0.90909, 0.72727, 0.36364, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.27273, 0.63636, 1.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+        {
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
+        },
+    }, // bilin_weights_y
+};
+
+static constexpr decimal BILIN_WEIGHTS_X_8[3*8] = {
+    1.00000, 0.36364, 0.00000,
+    0.63636, 0.72727, 0.09091,
+    0.27273, 0.90909, 0.45455,
+    0.54545, 0.81818, 0.18182,
+    0.18182, 0.81818, 0.54545,
+    0.45455, 0.90909, 0.27273,
+    0.09091, 0.72727, 0.63636,
+    0.36364, 1.00000, 0.00000,
+};
+
+static constexpr decimal BILIN_WEIGHTS_Y_5[6*5] = {
+    1.00000, 0.63636, 0.27273, 0.00000, 0.00000, 0.00000,
+    0.36364, 0.72727, 0.90909, 0.54545, 0.18182, 0.00000,
+    0.09091, 0.45455, 0.81818, 0.81818, 0.45455, 0.09091,
+    0.18182, 0.54545, 0.90909, 0.72727, 0.36364, 0.00000,
+    0.27273, 0.63636, 1.00000, 0.00000, 0.00000, 0.00000,
+};
+
 /** Test if two floating point numbers are almost equal */
 static inline bool is_close_enough(decimal a, decimal b)
 {
@@ -132,7 +284,7 @@ int populate_bilinear_weights(
 }
 
 /** See top header for description */
-void downsample(
+void _downsample(
     const decimal *__restrict__ inp,
     int w_inp,
     int h_inp,
@@ -152,7 +304,8 @@ void downsample(
     {
         for (int m = 0; m < w_out; ++m)
         {
-            uint8_t pixel_count = bw->bilin_pixel_count_x[m];
+            // uint8_t pixel_count = bw->bilin_pixel_count_x[m];
+            constexpr uint8_t pixel_count = 3;
             decimal weight_sum = FLT_MINVAL;  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t x = 0; x < pixel_count; ++x)
@@ -177,7 +330,8 @@ void downsample(
     {
         for (int n = 0; n < h_out; ++n)
         {
-            uint8_t pixel_count = bw->bilin_pixel_count_y[n];
+            // uint8_t pixel_count = bw->bilin_pixel_count_y[n];
+            constexpr uint8_t pixel_count = 6;
             decimal weight_sum = FLT_MINVAL;  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t y = 0; y < pixel_count; ++y)
@@ -196,4 +350,72 @@ void downsample(
     }
 }
 
-} // namespace
+void downsample(
+    const decimal *__restrict__ inp,
+    int w_inp,
+    int h_inp,
+    // const bilinear_weights *__restrict__ bw,
+    decimal *__restrict__ out,
+    int w_out,
+    int h_out
+){
+    ZoneScopedN("bilin");
+
+    // Buffer for holding intermediate results
+    static decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
+
+    // First, interpolate rows.
+    { ZoneScopedN("rows");
+    for (int y = 0; y < h_inp; ++y)
+    {
+        for (int m = 0; m < w_out; ++m)
+        {
+            // uint8_t pixel_count = bw->bilin_pixel_count_x[m];
+            constexpr uint8_t pixel_count = 3;
+            decimal weight_sum = FLT_MINVAL;  // prevent division by 0
+            decimal out_pixel = F(0.0);
+            for (uint8_t x = 0; x < pixel_count; ++x)
+            {
+                const uint8_t idx = BILIN_WEIGHTS_8x5.bilin_idx_x[m][x];
+                const decimal inp_pixel = inp[y*w_inp+idx];
+                // const decimal weight = BILIN_WEIGHTS_8x5.bilin_weights_x[m][x];
+                const decimal weight = BILIN_WEIGHTS_X_8[m*pixel_count+x];
+                out_pixel += inp_pixel * weight;
+                weight_sum += weight;
+            }
+            // the weights do not sum up to 1 => we need to normalize
+            out_pixel /= weight_sum;
+            tmp[y*w_out+m] = out_pixel;
+        }
+    }
+    }
+
+
+    // Next, columns
+    { ZoneScopedN("cols");
+    for (int n = 0; n < h_out; ++n)
+    {
+        for (int m = 0; m < w_out; ++m)
+        {
+            // uint8_t pixel_count = bw->bilin_pixel_count_y[n];
+            constexpr uint8_t pixel_count = 6;
+            decimal weight_sum = FLT_MINVAL;  // prevent division by 0
+            decimal out_pixel = F(0.0);
+            for (uint8_t y = 0; y < pixel_count; ++y)
+            {
+                const uint8_t idx = BILIN_WEIGHTS_8x5.bilin_idx_y[n][y];
+                const decimal inp_pixel = tmp[idx*w_out+m];
+                // const decimal weight = BILIN_WEIGHTS_8x5.bilin_weights_y[n][y];
+                const decimal weight = BILIN_WEIGHTS_Y_5[n*pixel_count+y];
+                out_pixel += inp_pixel * weight;
+                weight_sum += weight;
+            }
+            // the weights do not sum up to 1 => we need to normalize
+            out_pixel /= weight_sum;
+            out[n*w_out+m] = out_pixel;
+        }
+    }
+    }
+}
+
+} // namespace simple::bilin
