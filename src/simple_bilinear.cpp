@@ -150,22 +150,39 @@ static constexpr bilinear_weights BILIN_WEIGHTS_8x5 = {
 };
 
 static constexpr decimal BILIN_WEIGHTS_X_8[3*8] = {
-    1.00000, 0.36364, 0.00000,
-    0.63636, 0.72727, 0.09091,
-    0.27273, 0.90909, 0.45455,
-    0.54545, 0.81818, 0.18182,
-    0.18182, 0.81818, 0.54545,
-    0.45455, 0.90909, 0.27273,
-    0.09091, 0.72727, 0.63636,
-    0.36364, 1.00000, 0.00000,
+    // not normalized
+    // 1.00000, 0.36364, 0.00000,
+    // 0.63636, 0.72727, 0.09091,
+    // 0.27273, 0.90909, 0.45455,
+    // 0.54545, 0.81818, 0.18182,
+    // 0.18182, 0.81818, 0.54545,
+    // 0.45455, 0.90909, 0.27273,
+    // 0.09091, 0.72727, 0.63636,
+    // 0.36364, 1.00000, 0.00000,
+    // normalized
+    0.73333, 0.26667, 0.00000,
+    0.43750, 0.50000, 0.06250,
+    0.16667, 0.55556, 0.27778,
+    0.35294, 0.52941, 0.11765,
+    0.11765, 0.52941, 0.35294,
+    0.27778, 0.55556, 0.16667,
+    0.06250, 0.50000, 0.43750,
+    0.26667, 0.73333, 0.00000,
 };
 
 static constexpr decimal BILIN_WEIGHTS_Y_5[6*5] = {
-    1.00000, 0.63636, 0.27273, 0.00000, 0.00000, 0.00000,
-    0.36364, 0.72727, 0.90909, 0.54545, 0.18182, 0.00000,
-    0.09091, 0.45455, 0.81818, 0.81818, 0.45455, 0.09091,
-    0.18182, 0.54545, 0.90909, 0.72727, 0.36364, 0.00000,
-    0.27273, 0.63636, 1.00000, 0.00000, 0.00000, 0.00000,
+    // not normalized
+    // 1.00000, 0.63636, 0.27273, 0.00000, 0.00000, 0.00000,
+    // 0.36364, 0.72727, 0.90909, 0.54545, 0.18182, 0.00000,
+    // 0.09091, 0.45455, 0.81818, 0.81818, 0.45455, 0.09091,
+    // 0.18182, 0.54545, 0.90909, 0.72727, 0.36364, 0.00000,
+    // 0.27273, 0.63636, 1.00000, 0.00000, 0.00000, 0.00000,
+    // normalized
+    0.52381, 0.33333, 0.14286, 0.00000, 0.00000, 0.00000,
+    0.13333, 0.26667, 0.33333, 0.20000, 0.06667, 0.00000,
+    0.03333, 0.16667, 0.30000, 0.30000, 0.16667, 0.03333,
+    0.06667, 0.20000, 0.33333, 0.26667, 0.13333, 0.00000,
+    0.14286, 0.33333, 0.52381, 0.00000, 0.00000, 0.00000,
 };
 
 /** Test if two floating point numbers are almost equal */
@@ -243,6 +260,7 @@ int populate_bilinear_weights(
     {
         decimal x = F(0.0);
         uint8_t count = 0;
+        decimal weight_sum = F(0.0);
         for (int j = 0; j < w_inp; ++j)
         {
             decimal weight = tent(x, m, step_m);
@@ -250,11 +268,22 @@ int populate_bilinear_weights(
             {
                 bw->bilin_idx_x[i][count] = j;
                 bw->bilin_weights_x[i][count] = weight;
+                weight_sum += weight;
                 ++count;
             }
             x += step_x;
         }
         bw->bilin_pixel_count_x[i] = count;
+
+        // normalize weights to sum up to 1 (not doing this at runtime)
+        if (weight_sum > F(0.0))
+        {
+            for (int j = 0; j < count; ++j)
+            {
+                bw->bilin_weights_x[i][j] /= weight_sum;
+            }
+        }
+
         m += step_m;
     }
 
@@ -264,6 +293,7 @@ int populate_bilinear_weights(
     {
         decimal y = F(0.0);
         uint8_t count = 0;
+        decimal weight_sum = F(0.0);
         for (int j = 0; j < h_inp; ++j)
         {
             decimal weight = tent(y, n, step_n);
@@ -271,11 +301,22 @@ int populate_bilinear_weights(
             {
                 bw->bilin_idx_y[i][count] = j;
                 bw->bilin_weights_y[i][count] = weight;
+                weight_sum += weight;
                 ++count;
             }
             y += step_y;
         }
         bw->bilin_pixel_count_y[i] = count;
+
+        // normalize weights to sum up to 1 (not doing this at runtime)
+        if (weight_sum > F(0.0))
+        {
+            for (int j = 0; j < count; ++j)
+            {
+                bw->bilin_weights_y[i][j] /= weight_sum;
+            }
+        }
+
         n += step_n;
     }
     printf("\n");
@@ -372,7 +413,6 @@ void downsample(
         {
             // uint8_t pixel_count = bw->bilin_pixel_count_x[m];
             constexpr uint8_t pixel_count = 3;
-            decimal weight_sum = FLT_MINVAL;  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t x = 0; x < pixel_count; ++x)
             {
@@ -381,10 +421,8 @@ void downsample(
                 // const decimal weight = BILIN_WEIGHTS_8x5.bilin_weights_x[m][x];
                 const decimal weight = BILIN_WEIGHTS_X_8[m*pixel_count+x];
                 out_pixel += inp_pixel * weight;
-                weight_sum += weight;
             }
             // the weights do not sum up to 1 => we need to normalize
-            out_pixel /= weight_sum;
             tmp[y*w_out+m] = out_pixel;
         }
     }
@@ -399,7 +437,6 @@ void downsample(
         {
             // uint8_t pixel_count = bw->bilin_pixel_count_y[n];
             constexpr uint8_t pixel_count = 6;
-            decimal weight_sum = FLT_MINVAL;  // prevent division by 0
             decimal out_pixel = F(0.0);
             for (uint8_t y = 0; y < pixel_count; ++y)
             {
@@ -408,10 +445,8 @@ void downsample(
                 // const decimal weight = BILIN_WEIGHTS_8x5.bilin_weights_y[n][y];
                 const decimal weight = BILIN_WEIGHTS_Y_5[n*pixel_count+y];
                 out_pixel += inp_pixel * weight;
-                weight_sum += weight;
             }
             // the weights do not sum up to 1 => we need to normalize
-            out_pixel /= weight_sum;
             out[n*w_out+m] = out_pixel;
         }
     }
