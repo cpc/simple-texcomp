@@ -4,7 +4,6 @@
 #ifndef SIMPLE_MATHLIB_HPP
 #define SIMPLE_MATHLIB_HPP
 
-#include<cassert>
 #include<cstdint>
 #include<cstdio>
 

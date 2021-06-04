@@ -20,13 +20,6 @@ void find_minmaxcolor_bbox(
 
     for (int i = 0; i < 16; ++i)
     {
-        assert(!std::isnan(block[i].x));
-        assert(!std::isnan(block[i].y));
-        assert(!std::isnan(block[i].z));
-        assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
-        assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
-        assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
-
         *mincol = min3f(*mincol, block[i]);
         *maxcol = max3f(*maxcol, block[i]);
     }

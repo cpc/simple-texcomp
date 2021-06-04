@@ -1,5 +1,4 @@
 #include <cstring>
-#include <cassert>
 #include <fstream>
 
 #include "platform.hpp"
@@ -215,13 +214,6 @@ void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
 
 //     for (int i = 0; i < pixel_count; ++i)
 //     {
-//         assert(!std::isnan(block[i].x));
-//         assert(!std::isnan(block[i].y));
-//         assert(!std::isnan(block[i].z));
-//         assert((block[i].x >= F(0.0)) && (block[i].x <= F(1.0)));
-//         assert((block[i].y >= F(0.0)) && (block[i].y <= F(1.0)));
-//         assert((block[i].z >= F(0.0)) && (block[i].z <= F(1.0)));
-
 //         *mincol = min3f(*mincol, block[i]);
 //         *maxcol = max3f(*maxcol, block[i]);
 //     }
@@ -333,9 +325,6 @@ bool select_diagonal(
  */
 uint8_t quantize_2b(decimal x)
 {
-    assert((x >= F(0.0)) && (x <= F(1.0)));
-    assert(!std::isnan(x));
-
     // There is a couple of ways to do this. The correct one would be:
     //
     // uint8_t quant = (uint8_t)(x * F(3.0));
@@ -356,7 +345,6 @@ uint8_t quantize_2b(decimal x)
     // quant += (x > quant_midpoints_3b[quant]);
     quant >>= 1;
 
-    assert((quant >= 0) && (quant <= 3));
     return quant;
 }
 
@@ -367,13 +355,6 @@ uint8_t quantize_2b(decimal x)
  */
 Vec3i quantize_5b(Vec3f *vec)
 {
-    assert(!std::isnan(vec->x));
-    assert(!std::isnan(vec->y));
-    assert(!std::isnan(vec->z));
-    assert((vec->x >= F(0.0)) && (vec->x <= F(1.0)));
-    assert((vec->y >= F(0.0)) && (vec->y <= F(1.0)));
-    assert((vec->z >= F(0.0)) && (vec->z <= F(1.0)));
-
     // Ideal rounding yields about 0.002 dB improvement. Otherwise, non-ideal
     // rounding:
     int quant_x = iclamp((int)(vec->x * F(31.0) + F(0.5)), 0, 31);
@@ -396,9 +377,6 @@ Vec3i quantize_5b(Vec3f *vec)
     vec->y = (decimal)(dequant_y) * (F(1.0) / F(255.0));
     vec->z = (decimal)(dequant_z) * (F(1.0) / F(255.0));
 
-    assert((vec->x >= F(0.0)) && (vec->x <= F(1.0)));
-    assert((vec->y >= F(0.0)) && (vec->y <= F(1.0)));
-    assert((vec->z >= F(0.0)) && (vec->z <= F(1.0)));
     return Vec3i { quant_x, quant_y, quant_z };
 }
 
@@ -549,7 +527,6 @@ void encode_block(
 
         // It works when the norm is squared, why?
         Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
-        assert(ep_vec.dot(ep_vec) != F(0.0));
 
         // Project all pixels onto the endpoint vector. For each pixel, the result
         // tells how far it goes into the endpoint vector direction. Small values

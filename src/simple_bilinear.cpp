@@ -1,4 +1,3 @@
-#include <cassert>
 #include <cstdio>
 #include <cmath>
 
@@ -148,6 +147,7 @@ void downsample(
     static decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
 
     // First, interpolate rows.
+    { ZoneScopedN("rows");
     for (int y = 0; y < h_inp; ++y)
     {
         for (int m = 0; m < w_out; ++m)
@@ -165,12 +165,14 @@ void downsample(
             }
             // the weights do not sum up to 1 => we need to normalize
             out_pixel /= weight_sum;
-            assert(!std::isnan(out_pixel));
             tmp[y*w_out+m] = out_pixel;
         }
     }
+    }
+
 
     // Next, columns
+    { ZoneScopedN("cols");
     for (int m = 0; m < w_out; ++m)
     {
         for (int n = 0; n < h_out; ++n)
@@ -188,9 +190,9 @@ void downsample(
             }
             // the weights do not sum up to 1 => we need to normalize
             out_pixel /= weight_sum;
-            assert(!std::isnan(out_pixel));
             out[n*w_out+m] = out_pixel;
         }
+    }
     }
 }
 
