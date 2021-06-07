@@ -16,6 +16,8 @@ static constexpr decimal FLT_MINVAL = 0.000000059604645f16;
 static constexpr decimal FLT_MINVAL = std::numeric_limits<decimal>::min();
 #endif // FLAOT_PRECISION < 32
 
+// Full table for 8x5, used just for reference
+/*
 static constexpr bilinear_weights BILIN_WEIGHTS_8x5 = {
     { 2,  3,  3,  3,  3,  3,  3,  2,  0,  0,  0,  0, }, // bilin_pixel_count_x
     { 3,  5,  6,  5,  3,  0,  0,  0,  0,  0,  0,  0, }, // bilin_pixel_count_y
@@ -147,6 +149,26 @@ static constexpr bilinear_weights BILIN_WEIGHTS_8x5 = {
             0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000,
         },
     }, // bilin_weights_y
+};
+*/
+
+static constexpr uint8_t BILIN_IDX_X_8[8][3] = {
+    {  0,  1,  0, },
+    {  1,  2,  3, },
+    {  2,  3,  4, },
+    {  4,  5,  6, },
+    {  5,  6,  7, },
+    {  7,  8,  9, },
+    {  8,  9, 10, },
+    { 10, 11,  0, },
+};
+
+static constexpr uint8_t BILIN_IDX_Y_5[5][6] = {
+    {  0,  1,  2,  0,  0,  0, },
+    {  1,  2,  3,  4,  5,  0, },
+    {  3,  4,  5,  6,  7,  8, },
+    {  6,  7,  8,  9, 10,  0, },
+    {  9, 10, 11,  0,  0,  0, },
 };
 
 static constexpr decimal BILIN_WEIGHTS_X_8[3*8] = {
@@ -479,12 +501,11 @@ void downsample_12x12_to_8x5(
             decimal out_pixel = F(0.0);
             for (uint8_t x = 0; x < pixel_count_x; ++x)
             {
-                const uint8_t idx = BILIN_WEIGHTS_8x5.bilin_idx_x[m][x];
+                const uint8_t idx = BILIN_IDX_X_8[m][x];
                 const decimal inp_pixel = inp[y*w_inp+idx];
                 const decimal weight = BILIN_WEIGHTS_X_8[m*pixel_count_x+x];
                 out_pixel += inp_pixel * weight;
             }
-            // the weights do not sum up to 1 => we need to normalize
             tmp[y*w_out+m] = out_pixel;
         }
     }
@@ -499,12 +520,11 @@ void downsample_12x12_to_8x5(
             decimal out_pixel = F(0.0);
             for (uint8_t y = 0; y < pixel_count_y; ++y)
             {
-                const uint8_t idx = BILIN_WEIGHTS_8x5.bilin_idx_y[n][y];
+                const uint8_t idx = BILIN_IDX_Y_5[n][y];
                 const decimal inp_pixel = tmp[idx*w_out+m];
                 const decimal weight = BILIN_WEIGHTS_Y_5[n*pixel_count_y+y];
                 out_pixel += inp_pixel * weight;
             }
-            // the weights do not sum up to 1 => we need to normalize
             out[n*w_out+m] = out_pixel;
         }
     }
