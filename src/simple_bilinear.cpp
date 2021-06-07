@@ -409,6 +409,7 @@ void downsample(
     { ZoneScopedN("rows");
     for (int y = 0; y < h_inp; ++y)
     {
+        // this loop vectorizes on x86_64 but not on armv8-a
         for (int m = 0; m < w_out; ++m)
         {
             // uint8_t pixel_count = bw->bilin_pixel_count_x[m];
@@ -427,7 +428,6 @@ void downsample(
         }
     }
     }
-
 
     // Next, columns
     { ZoneScopedN("cols");
