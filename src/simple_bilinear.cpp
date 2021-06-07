@@ -8,13 +8,15 @@
 
 namespace simple::bilin {
 
-/* Minimum representable positive floating point number*/
+/* Used only in downsample_ref
+// Minimum representable positive floating point number
 #if FLOAT_PRECISION < 32
 // _Float16 is not in std
 static constexpr decimal FLT_MINVAL = 0.000000059604645f16;
 #else
 static constexpr decimal FLT_MINVAL = std::numeric_limits<decimal>::min();
 #endif // FLAOT_PRECISION < 32
+*/
 
 // Full table for 8x5, used just for reference
 /*
@@ -347,6 +349,7 @@ int populate_bilinear_weights(
 }
 
 /** Old code for reference */
+/*
 static void downsample_ref(
     const decimal *__restrict__ inp,
     int w_inp,
@@ -412,6 +415,7 @@ static void downsample_ref(
     }
     }
 }
+*/
 
 /** See top header for description */
 void downsample(
