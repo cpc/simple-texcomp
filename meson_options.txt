@@ -46,3 +46,10 @@ option(
   value: false,
   description: 'Enable extra diagnostics.',
 )
+
+option(
+  'openmp',
+  type: 'boolean',
+  value: true,
+  description: 'Enable OpenMP.',
+)

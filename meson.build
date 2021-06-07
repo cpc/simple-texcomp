@@ -46,22 +46,45 @@ else
 endif
 
 if get_option('fast_math')
+  message('Enabled fast math')
   add_project_arguments('-ffast-math', language: 'cpp')
 endif
 
-tracy_deps = [ ]
+compiler = meson.get_compiler('cpp')
+
+deps = [ ]
 if get_option('tracy_enable')
+  message('Enabled Tracy profiling')
   add_project_arguments('-DTRACY_ENABLE', language: 'cpp')
-  compiler = meson.get_compiler('cpp')
   libdl = compiler.find_library('dl', required: true)
   libpthread = compiler.find_library('pthread', required: true)
-  tracy_deps = [ libdl, libpthread ]
+  deps = [ libdl, libpthread ]
 endif
 
-scalar_args = [ '-fno-slp-vectorize', '-fno-vectorize',  '-fno-tree-vectorize', ]
+if get_option('openmp')
+  message('Enabled OpenMP')
+  deps = [ deps, dependency('openmp') ]
+endif
+
+if compiler.get_id() == 'clang'
+  scalar_args = [ '-fno-slp-vectorize', '-fno-vectorize',  '-fno-tree-vectorize', ]
+elif compiler.get_id() == 'gcc'
+  scalar_args = [ '-fno-tree-slp-vectorize', '-fno-tree-vectorize', ]
+else
+  msg = 'Unexpected compiler: @0@'
+  warning(msg.format(compiler.get_id()))
+  scalar_args = [ ]
+endif
+
 vector_args = [ '-march=native' ]
 if get_option('diagnostics')
-  vector_args = [ vector_args, '-Rpass=loop', '-Rpass-missed=loop-vectorize', '-Rpass-analysis=loop-vectorize',  '-fsave-optimization-record' ]
+  vector_args = [
+    vector_args,
+    '-Rpass=loop',
+    '-Rpass-missed=loop-vectorize',
+    '-Rpass-analysis=loop-vectorize',
+    '-fsave-optimization-record'
+  ]
 endif
 
 includes = include_directories('src')
@@ -90,7 +113,7 @@ executable(
   src_downsampler,
   include_directories: [ includes, stb_includes, ghc_includes, tracy_includes ],
   cpp_args: vector_args,
-  dependencies: tracy_deps,
+  dependencies: deps,
 )
 
 executable(
@@ -98,7 +121,7 @@ executable(
   src_transcoder,
   include_directories: [ includes, stb_includes, ghc_includes, tracy_includes ],
   cpp_args: vector_args,
-  dependencies: tracy_deps,
+  dependencies: deps,
 )
 
 executable(
@@ -106,5 +129,5 @@ executable(
   src_transcoder,
   include_directories: [ includes, stb_includes, ghc_includes, tracy_includes ],
   cpp_args: scalar_args,
-  dependencies: tracy_deps,
+  dependencies: deps,
 )

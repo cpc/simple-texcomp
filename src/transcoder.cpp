@@ -13,15 +13,15 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include "platform.hpp"
-#include "transcoder.hpp"
-#include "simple_texcomp.hpp"
+#include <Tracy.hpp>
 
 // #include <filesystem>
 #include <filesystem.hpp>
 namespace fs = ghc::filesystem;
 
-#include <Tracy.hpp>
+#include "platform.hpp"
+#include "transcoder.hpp"
+#include "simple_texcomp.hpp"
 
 namespace simple {
 
@@ -115,8 +115,8 @@ int encode_image(
     ZoneScopedN("enc_img");
 
     // Input block size
-    const int block_w = (ENC_FORMAT == ASTC) ? astc::BLOCK_X : 4;
-    const int block_h = (ENC_FORMAT == ASTC) ? astc::BLOCK_Y : 4;
+    constexpr int block_w = (ENC_FORMAT == ASTC) ? astc::BLOCK_X : 4;
+    constexpr int block_h = (ENC_FORMAT == ASTC) ? astc::BLOCK_Y : 4;
 
     // Number of blocks in horizontal and vertical dimension
     const int nblocks_x = img_w / block_w;
@@ -151,6 +151,9 @@ int encode_image(
 
     // Iterate through blocks and encode them one-by-one (this can be easily
     // parallelized, all blocks are independent to each other)
+#ifdef _OPENMP
+    #pragma omp parallel for
+#endif
     for (int block_y = 0; block_y < nblocks_y; ++block_y)
     {
         for (int block_x = 0; block_x < nblocks_x; ++block_x)
@@ -276,15 +279,15 @@ int transcoder_entry(
     LOGI("Output directory: '%s'\n", out_dir.data());
 
 #ifdef ANDROID
-    LOGI("Android build");
+    LOGI("Android build\n");
 #endif // ANDROID
 
 #if FLOAT_PRECISION == 64
-    LOGI("Floating point precision: double");
+    LOGI("Floating point precision: double\n");
 #elif FLOAT_PRECISION == 16
-    LOGI("Floating point precision: half");
+    LOGI("Floating point precision: half\n");
 #else
-    LOGI("Floating point precision: float");
+    LOGI("Floating point precision: float\n");
 #endif
 
     // Init & print out format-specific info
