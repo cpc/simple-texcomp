@@ -17,6 +17,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
+#include <filesystem.hpp>
+namespace fs = ghc::filesystem;
+
 #include "simple_texcomp.hpp"
 
 using namespace simple;
@@ -116,6 +119,37 @@ static void print_bilinear_weights(const bilin::bilinear_weights* bw)
     printf("};\n");
 }
 
+static int save_image(
+    std::vector<decimal> img_pixels,
+    int out_w,
+    int out_h,
+    int nch,
+    fs::path out_file
+){
+    std::vector<uint8_t> out_pixels(img_pixels.size());
+    for (size_t i = 0; i < out_pixels.size(); ++i)
+    {
+        decimal out_pixel_flt = img_pixels.at(i);
+        if (out_pixel_flt > F(1.0))
+        {
+            printf("ERROR: Result pixel > 1.0: %ld, %.6f\n",
+                i, (double)out_pixel_flt);
+        }
+        out_pixels.at(i) = (uint8_t)(out_pixel_flt * F(255.0));
+    }
+
+    int ret = stbi_write_png(
+        out_file.c_str(),
+        out_w,
+        out_h,
+        nch,
+        out_pixels.data(),
+        out_w*nch
+    );
+
+    return ret;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 5)
@@ -123,8 +157,11 @@ int main(int argc, char **argv)
         err_exit("Provide 4 arguments", true);
     }
 
-    const std::string inp_file = argv[1];
-    const std::string out_file = argv[2];
+    const fs::path inp_file = argv[1];
+    const fs::path out_file = argv[2];
+    const fs::path out_file_12x12_to_8x5 = fs::path(argv[2]).replace_filename(
+        out_file.stem().string() + "_12x12_to_8x5" + out_file.extension().string()
+    );
 
     int M = atoi(argv[3]);
     int N = atoi(argv[4]);
@@ -137,7 +174,7 @@ int main(int argc, char **argv)
     // Read input image
     int inp_w, inp_h, nch;
     uint8_t *inp_pixels = stbi_load(
-        inp_file.data(),
+        inp_file.c_str(),
         &inp_w,
         &inp_h,
         &nch,
@@ -174,36 +211,48 @@ int main(int argc, char **argv)
     bilin::downsample(
         inp_pixels_flt.data(),
         inp_w, inp_h,
-        // &bw,
+        &bw,
         out_pixels_flt.data(),
         M, N
     );
 
     // Save output image
-    printf("Saving result to: %s\n", out_file.c_str());
-    std::vector<uint8_t> out_pixels(M*N*nch);
-    for (size_t i = 0; i < out_pixels.size(); ++i)
-    {
-        decimal out_pixel_flt = out_pixels_flt.at(i);
-        if (out_pixel_flt > F(1.0))
-        {
-            printf("ERROR: Result pixel > 1.0: %ld, %.6f\n",
-                i, (double)out_pixel_flt);
-        }
-        out_pixels.at(i) = (uint8_t)(out_pixel_flt * F(255.0));
-    }
-
-    ret = stbi_write_png(
-        out_file.data(),
-        M,
-        N,
-        nch,
-        out_pixels.data(),
-        M*nch
+    printf("\nSaving result to: %s\n", out_file.c_str());
+    ret = save_image(
+        out_pixels_flt,
+        M, N, nch,
+        out_file
     );
     if (ret == 0)
     {
         err_exit("Can't save output image");
+    }
+
+    // Downsample & save fixed-sized images
+    if ((inp_w == 12) && (inp_h == 12))
+    {
+        std::vector<decimal> out_pixels_flt_12x12_to_8x5(8*5*nch);
+
+        bilin::downsample_12x12_to_8x5(
+            inp_pixels_flt.data(),
+            out_pixels_flt_12x12_to_8x5.data()
+        );
+
+        printf("Saving result to: %s\n", out_file_12x12_to_8x5.c_str());
+        ret = save_image(
+            out_pixels_flt_12x12_to_8x5,
+            M, N, nch,
+            out_file_12x12_to_8x5
+        );
+        if (ret == 0)
+        {
+            err_exit("Can't save output image");
+        }
+    }
+    else
+    {
+        printf("WARNING: Input size is not 12x12, not downsampling with "
+            "12x12_to_8x5\n");
     }
 
     stbi_image_free(inp_pixels);

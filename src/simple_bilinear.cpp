@@ -324,8 +324,8 @@ int populate_bilinear_weights(
     return 0;
 }
 
-/** See top header for description */
-void _downsample(
+/** Old code for reference */
+static void downsample_ref(
     const decimal *__restrict__ inp,
     int w_inp,
     int h_inp,
@@ -391,11 +391,12 @@ void _downsample(
     }
 }
 
+/** See top header for description */
 void downsample(
     const decimal *__restrict__ inp,
     int w_inp,
     int h_inp,
-    // const bilinear_weights *__restrict__ bw,
+    const bilinear_weights *__restrict__ bw,
     decimal *__restrict__ out,
     int w_out,
     int h_out
@@ -412,15 +413,13 @@ void downsample(
         // this loop vectorizes on x86_64 but not on armv8-a
         for (int m = 0; m < w_out; ++m)
         {
-            // uint8_t pixel_count = bw->bilin_pixel_count_x[m];
-            constexpr uint8_t pixel_count = 3;
+            uint8_t pixel_count = bw->bilin_pixel_count_x[m];
             decimal out_pixel = F(0.0);
             for (uint8_t x = 0; x < pixel_count; ++x)
             {
-                const uint8_t idx = BILIN_WEIGHTS_8x5.bilin_idx_x[m][x];
+                const uint8_t idx = bw->bilin_idx_x[m][x];
                 const decimal inp_pixel = inp[y*w_inp+idx];
-                // const decimal weight = BILIN_WEIGHTS_8x5.bilin_weights_x[m][x];
-                const decimal weight = BILIN_WEIGHTS_X_8[m*pixel_count+x];
+                const decimal weight = bw->bilin_weights_x[m][x];
                 out_pixel += inp_pixel * weight;
             }
             // the weights do not sum up to 1 => we need to normalize
@@ -435,15 +434,74 @@ void downsample(
     {
         for (int m = 0; m < w_out; ++m)
         {
-            // uint8_t pixel_count = bw->bilin_pixel_count_y[n];
-            constexpr uint8_t pixel_count = 6;
+            uint8_t pixel_count = bw->bilin_pixel_count_y[n];
             decimal out_pixel = F(0.0);
             for (uint8_t y = 0; y < pixel_count; ++y)
             {
+                const uint8_t idx = bw->bilin_idx_y[n][y];
+                const decimal inp_pixel = tmp[idx*w_out+m];
+                const decimal weight = bw->bilin_weights_y[n][y];
+                out_pixel += inp_pixel * weight;
+            }
+            // the weights do not sum up to 1 => we need to normalize
+            out[n*w_out+m] = out_pixel;
+        }
+    }
+    }
+}
+
+/** See top header for description */
+void downsample_12x12_to_8x5(
+    const decimal *__restrict__ inp,
+    decimal *__restrict__ out
+){
+    ZoneScopedN("bilin");
+
+    constexpr int w_inp = 12;
+    constexpr int h_inp = 12;
+    constexpr int w_out = 8;
+    constexpr int h_out = 5;
+
+    // size of the bilin. kernel
+    constexpr uint8_t pixel_count_x = 3;
+    constexpr uint8_t pixel_count_y = 6;
+
+    // Buffer for holding intermediate results
+    static decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
+
+    // First, interpolate rows.
+    { ZoneScopedN("rows");
+    for (int y = 0; y < h_inp; ++y)
+    {
+        // this loop vectorizes on x86_64 but not on armv8-a
+        for (int m = 0; m < w_out; ++m)
+        {
+            decimal out_pixel = F(0.0);
+            for (uint8_t x = 0; x < pixel_count_x; ++x)
+            {
+                const uint8_t idx = BILIN_WEIGHTS_8x5.bilin_idx_x[m][x];
+                const decimal inp_pixel = inp[y*w_inp+idx];
+                const decimal weight = BILIN_WEIGHTS_X_8[m*pixel_count_x+x];
+                out_pixel += inp_pixel * weight;
+            }
+            // the weights do not sum up to 1 => we need to normalize
+            tmp[y*w_out+m] = out_pixel;
+        }
+    }
+    }
+
+    // Next, columns
+    { ZoneScopedN("cols");
+    for (int n = 0; n < h_out; ++n)
+    {
+        for (int m = 0; m < w_out; ++m)
+        {
+            decimal out_pixel = F(0.0);
+            for (uint8_t y = 0; y < pixel_count_y; ++y)
+            {
                 const uint8_t idx = BILIN_WEIGHTS_8x5.bilin_idx_y[n][y];
                 const decimal inp_pixel = tmp[idx*w_out+m];
-                // const decimal weight = BILIN_WEIGHTS_8x5.bilin_weights_y[n][y];
-                const decimal weight = BILIN_WEIGHTS_Y_5[n*pixel_count+y];
+                const decimal weight = BILIN_WEIGHTS_Y_5[n*pixel_count_y+y];
                 out_pixel += inp_pixel * weight;
             }
             // the weights do not sum up to 1 => we need to normalize

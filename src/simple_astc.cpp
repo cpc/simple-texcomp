@@ -82,6 +82,7 @@ int store_astc_image(
 
 /* ========================================================================= */
 
+/*
 // Quantization midpoints for better rounding
 // taken from: https://gist.github.com/castano/c92c7626f288f9e99e158520b14a61cf
 constexpr decimal quant_midpoints_2b[4] = {
@@ -125,26 +126,57 @@ void init_tables() {
     }
     printf("%.8f\n", 1.0);
 }
+*/
 
 /* Pre-computed bilinear filter weights */
-// bilin::bilinear_weights bilin_weights;
+/*
+bilin::bilinear_weights bilin_weights;
 
-// int init_astc(
-//     int block_size_x,
-//     int block_size_y,
-//     int weight_grid_x,
-//     int weight_grid_y
-// ){
-//     // init_tables();
-//     int ret = populate_bilinear_weights(
-//         block_size_x,
-//         block_size_y,
-//         &bilin_weights,
-//         weight_grid_x,
-//         weight_grid_y
-//     );
-//     return ret;
-// }
+int init_astc(
+    int block_size_x,
+    int block_size_y,
+    int weight_grid_x,
+    int weight_grid_y
+){
+    // init_tables();
+    int ret = populate_bilinear_weights(
+        block_size_x,
+        block_size_y,
+        &bilin_weights,
+        weight_grid_x,
+        weight_grid_y
+    );
+    return ret;
+}
+*/
+
+/* Debug */
+/*
+void print_bin(unsigned int num, unsigned int nb)
+{
+	for (uint b = 0; b < nb; ++b)
+	{
+		unsigned int x = (num >> (nb-1-b)) & 1;
+		printf("%d", x);
+	}
+}
+
+void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
+{
+    Vec3f mincol2 = mincol * F(255.0);
+    Vec3f maxcol2 = maxcol * F(255.0);
+
+    printf("%s mincol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+        pre,
+        (double)mincol.x, (double)mincol.y, (double)mincol.z,
+        (double)mincol2.x, (double)mincol2.y, (double)mincol2.z
+    );
+    printf("    maxcol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+        (double)maxcol.x, (double)maxcol.y, (double)maxcol.z,
+        (double)maxcol2.x, (double)maxcol2.y, (double)maxcol2.z
+    );
+}
+*/
 
 // Taken from astcenc:
 // routine to write up to 8 bits
@@ -175,31 +207,6 @@ int bitrev8(int p)
 	p = ((p & 0x33) << 2) | ((p >> 2) & 0x33);
 	p = ((p & 0x55) << 1) | ((p >> 1) & 0x55);
 	return p;
-}
-
-void print_bin(unsigned int num, unsigned int nb)
-{
-	for (uint b = 0; b < nb; ++b)
-	{
-		unsigned int x = (num >> (nb-1-b)) & 1;
-		printf("%d", x);
-	}
-}
-
-void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
-{
-    Vec3f mincol2 = mincol * F(255.0);
-    Vec3f maxcol2 = maxcol * F(255.0);
-
-    printf("%s mincol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
-        pre,
-        (double)mincol.x, (double)mincol.y, (double)mincol.z,
-        (double)mincol2.x, (double)mincol2.y, (double)mincol2.z
-    );
-    printf("    maxcol: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
-        (double)maxcol.x, (double)maxcol.y, (double)maxcol.z,
-        (double)maxcol2.x, (double)maxcol2.y, (double)maxcol2.z
-    );
 }
 
 /* Find min/max color as a corners of a bounding box of the block */
@@ -386,15 +393,15 @@ void encode_block(
 ){
     ZoneScopedN("enc_blk_astc");
 
-    const uint16_t block_mode = 102;
-    const uint8_t wgt_grid_w = 8;
-    const uint8_t wgt_grid_h = 5;
-    const uint8_t wgt_count = wgt_grid_w * wgt_grid_h;
+    constexpr uint16_t block_mode = 102;
+    constexpr uint8_t wgt_grid_w = 8;
+    constexpr uint8_t wgt_grid_h = 5;
+    constexpr uint8_t wgt_count = wgt_grid_w * wgt_grid_h;
 
-    // const uint8_t color_quant_level = 11;  // range 32
-    const uint8_t ep_bits = 5;
-    // const uint8_t wgt_quant_mode = 2;      // range 4
-    const uint8_t wgt_bits = 2;
+    // constexpr uint8_t color_quant_level = 11;  // range 32
+    constexpr uint8_t ep_bits = 5;
+    // constexpr uint8_t wgt_quant_mode = 2;      // range 4
+    constexpr uint8_t wgt_bits = 2;
 
     constexpr uint8_t block_size_x = 12;
     constexpr uint8_t block_size_y = 12;
@@ -546,14 +553,9 @@ void encode_block(
 
         // We downsample the weight grid before quantization
         // TODO: Investigate possible shift in values
-        bilin::downsample(
+        bilin::downsample_12x12_to_8x5(
             ideal_weights,
-            block_size_x,
-            block_size_y,
-            // &bilin_weights,
-            downsampled_weights,
-            wgt_grid_w,
-            wgt_grid_h
+            downsampled_weights
         );
 
         // Quantize weights
@@ -683,4 +685,4 @@ void encode_block(
 #endif
 }
 
-} // namespace
+} // namespace simple::astc

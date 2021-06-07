@@ -177,13 +177,19 @@ namespace bilin {
      * Returns 1 in case of error, 0 on success
      */
     void downsample(
-        const decimal* inp,  // input values
-        int w_inp,           // width of the input block (X)
-        int h_inp,           // height of the input block (Y)
-        // const bilinear_weights* bw, // table with pre-computed filter weights
-        decimal* out,        // output values
-        int w_out,           // width of the output block (M; M <= X)
-        int h_out            // height of the output block (N; N <= Y)
+        const decimal *__restrict__ inp, // input values
+        int w_inp,                       // width of the input block (X)
+        int h_inp,                       // height of the input block (Y)
+        const bilinear_weights *__restrict__ bw,  // pre-computed values
+        decimal *__restrict__ out,       // output values
+        int w_out,                       // width of the output block (M)
+        int h_out                        // height of the output block (N)
+    );
+
+    /** Same as downsample but with fixed inp/out size */
+    void downsample_12x12_to_8x5(
+        const decimal *__restrict__ inp,  // input values
+        decimal *__restrict__ out         // output values
     );
 
 }
