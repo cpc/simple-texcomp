@@ -39,3 +39,10 @@ option(
   value: false,
   description: 'Enable Tracy profiling.',
 )
+
+option(
+  'diagnostics',
+  type: 'boolean',
+  value: false,
+  description: 'Enable extra diagnostics.',
+)

@@ -60,6 +60,9 @@ endif
 
 scalar_args = [ '-fno-slp-vectorize', '-fno-vectorize',  '-fno-tree-vectorize', ]
 vector_args = [ '-march=native' ]
+if get_option('diagnostics')
+  vector_args = [ vector_args, '-Rpass=loop', '-Rpass-missed=loop-vectorize', '-Rpass-analysis=loop-vectorize',  '-fsave-optimization-record' ]
+endif
 
 includes = include_directories('src')
 stb_includes = include_directories('extern/stb', is_system: true)
