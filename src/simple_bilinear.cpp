@@ -362,7 +362,7 @@ static void downsample_ref(
     ZoneScopedN("bilin");
 
     // Buffer for holding intermediate results
-    static decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
+    decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
 
     // First, interpolate rows.
     { ZoneScopedN("rows");
@@ -430,7 +430,7 @@ void downsample(
     ZoneScopedN("bilin");
 
     // Buffer for holding intermediate results
-    static decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
+    decimal tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
 
     // First, interpolate rows.
     { ZoneScopedN("rows");
