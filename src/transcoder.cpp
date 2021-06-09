@@ -152,7 +152,7 @@ int encode_image(
     // Iterate through blocks and encode them one-by-one (this can be easily
     // parallelized, all blocks are independent to each other)
 #ifdef _OPENMP
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(guided) collapse(2)
 #endif
     for (int block_y = 0; block_y < nblocks_y; ++block_y)
     {
