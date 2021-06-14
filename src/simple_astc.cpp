@@ -528,11 +528,12 @@ void encode_block(
 
         // Move the endpoints line segment such that mincol is at zero
         Vec3f ep_vec = maxcol - mincol;
-        // Normalize the endpoint vector
-        // decimal norm = F(1.0) / std::sqrt(ep_vec.dot(ep_vec));
-        // Vec3f ep_vec_norm = ep_vec * norm;
 
-        // It works when the norm is squared, why?
+        // To get projection of pixel onto ep_vec, we have to normalize. Second
+        // normalization is for keeping the value between 0 and 1 =>
+        //   1 / sqrt(dot) * 1 / sqrt(dot) = 1 / dot
+        // With just 1 / sqrt(dot), the projected values in the following loop
+        // would be between 0 and |ep_vec|.
         Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
 
         // Project all pixels onto the endpoint vector. For each pixel, the result
@@ -544,6 +545,8 @@ void encode_block(
         decimal ideal_weights[MAX_PIXEL_COUNT];
         for (int i = 0; i < pixel_count; ++i)
         {
+            // clamp is necessary because the min/max values shrank inwards due
+            // to inset / quantization but the pixels didn't
             ideal_weights[i] = fclamp(
                 (block_flt[i] - mincol).dot(ep_vec_scaled),
                 F(0.0),
