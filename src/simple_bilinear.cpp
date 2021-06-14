@@ -499,7 +499,6 @@ void downsample_12x12_to_8x5(
     { ZoneScopedN("rows");
     for (int y = 0; y < h_inp; ++y)
     {
-        // this loop vectorizes on x86_64 but not on armv8-a
         for (int m = 0; m < w_out; ++m)
         {
             decimal out_pixel = F(0.0);
