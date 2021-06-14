@@ -426,7 +426,7 @@ void encode_block(
 //        #pragma clang loop unroll(disable)
         #pragma clang loop vectorize_width(4, scalable)
         #pragma clang loop interleave_count(2)
-#endif
+#endif  // ANDROID
         for (int i = 0; i < pixel_count; ++i) {
             block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(255.0);
             block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(255.0);
@@ -443,7 +443,7 @@ void encode_block(
     Vec3f mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
     Vec3f maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
     // print_minmax("   ", mincol, maxcol);
-#else
+#else  // ASTC_TRIM_ENDPOINTS == 0
     // Trimmed method, min/max are selected so they are within avg+=2.0*stddev
     Vec3f sum = { F(0.0), F(0.0), F(0.0) };
     Vec3f sq_sum = { F(0.0), F(0.0), F(0.0) };
@@ -475,7 +475,7 @@ void encode_block(
     Vec3f maxcol = avg;
     find_minmax_trimmed(block_flt, pixel_count, avg, std, &mincol, &maxcol);
     // print_minmax("m2 ", mincol, maxcol);
-#endif
+#endif  // ASTC_TRIM_ENDPOINTS == 0
 
 #if ASTC_SELECT_DIAG == 1
     bool swapped = select_diagonal(block_flt, pixel_count, &mincol, &maxcol);
@@ -483,7 +483,7 @@ void encode_block(
     // {
     //     print_minmax("swp", mincol, maxcol);
     // }
-#endif
+#endif  // ASTC_SELECT_DIAG == 1
     inset_bbox(&mincol, &maxcol);
     // print_minmax("ins", mincol, maxcol);
 
@@ -504,7 +504,7 @@ void encode_block(
         maxcol = tmpf;
         // print_minmax("swp", mincol, maxcol);
     }
-#endif
+#endif  // ASTC_SELECT_DIAG == 1
     // printf("int mincol:                    %3d %3d %3d\n",
     //     mincol_int.x, mincol_int.y, mincol_int.z
     // );
@@ -682,7 +682,7 @@ void encode_block(
         print_bin(out_buf[i], 8);
         printf("\n");
     }
-#endif
+#endif  // 0
 }
 
 } // namespace simple::astc
