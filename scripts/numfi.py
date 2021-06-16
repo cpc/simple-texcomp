@@ -8,8 +8,6 @@
 #TODO: sin(numfi) return error larger than sin(fxpmath), further study on __array_ufunc__ is needed
 import numpy as np
 import warnings
-import traceback
-import sys
 
 def quantize(array, signed, n_word, n_frac, rounding, overflow):
     bound = 2**(n_word-n_frac-(1 if signed else 0))
@@ -18,7 +16,6 @@ def quantize(array, signed, n_word, n_frac, rounding, overflow):
 
     if upper == bound: # upper==bound means nfrac is too large that precision less than floating point resolution
         warnings.warn(f"n_frac={n_frac} is too large, overflow/underflow may happen during quantization (n_word={n_word})")
-        traceback.print_stack()
     if 2**(n_word-(1 if signed else 0))-1 > np.iinfo(np.int64).max:
         raise OverflowError(f"cannot quantize array, upper/lower overflow np.int64 bound")
 
