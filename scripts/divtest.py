@@ -49,7 +49,7 @@ def fixed(x, s=0, w=24, f=16, rounding='round', overflow='saturate', fixed=True)
 def approx_newton_fixed(x, n):
     # Scale x to be within [0.5, 1.0]
     x_sc = fixed(np.copy(x))
-    sc = np.zeros_like(x, dtype=int)
+    sc = np.zeros(x.shape, dtype=np.int8)
     for i, xi in enumerate(x_sc):
         while x_sc[i] < 0.5:
             x_sc[i] = x_sc[i] << 1
@@ -71,7 +71,8 @@ def approx_newton_fixed(x, n):
         y1 = fixed(2.0) * y0 - x_sc * y0 * y0
         y0 = y1
 
-    return y1<<sc, sc
+    res = np.where(sc >= 0, y1 << sc, y1 >> -sc)
+    return res, sc
 
 
 if __name__ == '__main__':
