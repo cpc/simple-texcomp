@@ -40,7 +40,7 @@ def approx_newton_float(x, n):
     return y1*sc, sc
 
 
-def fixed(x, s=0, w=24, f=16, rounding='round', overflow='saturate', fixed=True):
+def fixed(x, s=0, w=16, f=8, rounding='round', overflow='saturate', fixed=True):
     if not isinstance(x, Iterable):
         x = [x]
     return numfi(x, s=s, w=w, f=f, rounding=rounding, overflow=overflow, fixed=fixed)
