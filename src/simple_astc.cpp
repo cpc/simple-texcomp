@@ -151,7 +151,7 @@ int init_astc(
 */
 
 /* Debug */
-/*
+
 void print_bin(unsigned int num, unsigned int nb)
 {
 	for (uint b = 0; b < nb; ++b)
@@ -176,7 +176,14 @@ void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
         (double)maxcol2.x, (double)maxcol2.y, (double)maxcol2.z
     );
 }
-*/
+
+void print_minmax(const char *pre, Vec3u8 mincol, Vec3u8 maxcol)
+{
+    int l = strlen(pre);
+    printf("%*s mincol: %3d %3d %3d\n", l, pre, mincol.x, mincol.y, mincol.z);
+    printf("%*s maxcol: %3d %3d %3d\n", l, "", maxcol.x, maxcol.y, maxcol.z);
+}
+
 
 // Taken from astcenc:
 // routine to write up to 8 bits
@@ -387,6 +394,24 @@ Vec3i quantize_5b(Vec3f *vec)
     return Vec3i { quant_x, quant_y, quant_z };
 }
 
+Vec3u8 quantize_5b_u8(Vec3u8 *vec)
+{
+    // TODO: rounding?
+    uint8_t quant_x = vec->x >> 3;
+    uint8_t quant_y = vec->y >> 3;
+    uint8_t quant_z = vec->z >> 3;
+
+    uint8_t dequant_x = (quant_x << 3) | (quant_x >> 2);
+    uint8_t dequant_y = (quant_y << 3) | (quant_y >> 2);
+    uint8_t dequant_z = (quant_z << 3) | (quant_z >> 2);
+
+    vec->x = dequant_x;
+    vec->y = dequant_y;
+    vec->z = dequant_z;
+
+    return Vec3u8 { quant_x, quant_y, quant_z };
+}
+
 void encode_block(
     const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
     uint32_t out[4]
@@ -409,7 +434,7 @@ void encode_block(
 
     constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
 
-    // printf("=== BLOCK ===\n");
+    printf("=== BLOCK ===\n");
 
     // Convert the block into floating point and determine the line through
     // color space
@@ -442,7 +467,7 @@ void encode_block(
     }
     Vec3f mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
     Vec3f maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
-    // print_minmax("   ", mincol, maxcol);
+    print_minmax("   ", mincol, maxcol);
 #else  // ASTC_TRIM_ENDPOINTS == 0
     // Trimmed method, min/max are selected so they are within avg+=2.0*stddev
     Vec3f sum = { F(0.0), F(0.0), F(0.0) };
@@ -485,12 +510,12 @@ void encode_block(
     // }
 #endif  // ASTC_SELECT_DIAG == 1
     inset_bbox(&mincol, &maxcol);
-    // print_minmax("ins", mincol, maxcol);
+    print_minmax("ins", mincol, maxcol);
 
     // Quantize endpoints
     Vec3i mincol_int = quantize_5b(&mincol);
     Vec3i maxcol_int = quantize_5b(&maxcol);
-    // print_minmax("qnt", mincol, maxcol);
+    print_minmax("qnt", mincol, maxcol);
 
 #if ASTC_SELECT_DIAG == 1
     if ( (mincol_int.x + mincol_int.y + mincol_int.z)
@@ -686,6 +711,86 @@ void encode_block(
         printf("\n");
     }
 #endif  // 0
+}
+
+void encode_block_int(
+    const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
+    uint32_t out[4]
+){
+    ZoneScopedN("enc_blk_astc");
+
+    constexpr uint16_t block_mode = 102;
+    constexpr uint8_t wgt_grid_w = 8;
+    constexpr uint8_t wgt_grid_h = 5;
+    constexpr uint8_t wgt_count = wgt_grid_w * wgt_grid_h;
+
+    // constexpr uint8_t color_quant_level = 11;  // range 32
+    constexpr uint8_t ep_bits = 5;
+    // constexpr uint8_t wgt_quant_mode = 2;      // range 4
+    constexpr uint8_t wgt_bits = 2;
+
+    constexpr uint8_t block_size_x = 12;
+    constexpr uint8_t block_size_y = 12;
+    constexpr uint8_t pixel_count = block_size_x * block_size_y;
+
+    constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
+
+    printf("=== BLOCK ===\n");
+
+    Vec3u8 block_u8[MAX_PIXEL_COUNT];
+    // using tmp values to allow vectorization
+    uint8_t tmp_min[3] = { 255, 255, 255 };
+    uint8_t tmp_max[3] = { 0, 0, 0 };
+    {
+        ZoneScopedN("minmax");
+#ifdef ANDROID
+//        #pragma clang loop interleave(disable)
+//        #pragma clang loop unroll(disable)
+        #pragma clang loop vectorize_width(4, scalable)
+        #pragma clang loop interleave_count(2)
+#endif  // ANDROID
+        for (int i = 0; i < pixel_count; ++i) {
+            block_u8[i].x = block_pixels[NCH_RGB * i];
+            block_u8[i].y = block_pixels[NCH_RGB * i + 1];
+            block_u8[i].z = block_pixels[NCH_RGB * i + 2];
+
+            // TODO (maybe): min/max without branching
+            // https://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
+            tmp_min[0] = u8min(tmp_min[0], block_u8[i].x);
+            tmp_min[1] = u8min(tmp_min[1], block_u8[i].y);
+            tmp_min[2] = u8min(tmp_min[2], block_u8[i].z);
+            tmp_max[0] = u8max(tmp_max[0], block_u8[i].x);
+            tmp_max[1] = u8max(tmp_max[1], block_u8[i].y);
+            tmp_max[2] = u8max(tmp_max[2], block_u8[i].z);
+        }
+    }
+    Vec3u8 mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
+    Vec3u8 maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
+    print_minmax("   ", mincol, maxcol);
+
+    // inset bounding box
+    Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/255th, too small
+    mincol = satadd(mincol, inset);
+    maxcol = satsub(maxcol, inset);
+    print_minmax("ins", mincol, maxcol);
+
+    // Quantize endpoints
+    Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
+    Vec3u8 maxcol_quant = quantize_5b_u8(&maxcol);
+    print_minmax("qnt", mincol, maxcol);
+
+    uint8_t quantized_weights[MAX_PIXEL_COUNT];
+
+    if (mincol_quant == maxcol_quant)
+    {
+        // When both endpoints are the same, encode all weights and zeros and
+        // skip the calculation
+        for (int i = 0; i < wgt_count; ++i)
+        {
+            quantized_weights[i] = 0;
+        }
+    } else {
+    }
 }
 
 } // namespace simple::astc

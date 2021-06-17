@@ -38,8 +38,8 @@ void pad_image(
     int& pad_h
 ){
     // Input block size
-    const int block_w = (ENC_FORMAT == ASTC) ? astc::BLOCK_X : 4;
-    const int block_h = (ENC_FORMAT == ASTC) ? astc::BLOCK_Y : 4;
+    const int block_w = ((ENC_FORMAT == ASTC) || (ENC_FORMAT == ASTC_INT)) ? astc::BLOCK_X : 4;
+    const int block_h = ((ENC_FORMAT == ASTC) || (ENC_FORMAT == ASTC_INT)) ? astc::BLOCK_Y : 4;
 
     // Number of blocks in horizontal and vertical dimension
     const int nblocks_x = ( img_w + (block_w - 1) ) / block_w;
@@ -115,8 +115,8 @@ int encode_image(
     ZoneScopedN("enc_img");
 
     // Input block size
-    constexpr int block_w = (ENC_FORMAT == ASTC) ? astc::BLOCK_X : 4;
-    constexpr int block_h = (ENC_FORMAT == ASTC) ? astc::BLOCK_Y : 4;
+    constexpr int block_w = ((ENC_FORMAT == ASTC) || (ENC_FORMAT == ASTC_INT)) ? astc::BLOCK_X : 4;
+    constexpr int block_h = ((ENC_FORMAT == ASTC) || (ENC_FORMAT == ASTC_INT)) ? astc::BLOCK_Y : 4;
 
     // Number of blocks in horizontal and vertical dimension
     const int nblocks_x = img_w / block_w;
@@ -140,6 +140,10 @@ int encode_image(
     case ASTC:
         block_nints = 4; // 128 bits per block
         encode_block = astc::encode_block;
+        break;
+    case ASTC_INT:
+        block_nints = 4; // 128 bits per block
+        encode_block = astc::encode_block_int;
         break;
     default:
         LOGE("Unsupported encoding format\n");
@@ -212,6 +216,7 @@ int decode_image(
         decode_block = ycocg_bc3::decode_block;
         break;
     case ASTC:
+    case ASTC_INT:
         return 0;
     default:
         LOGE("Unsupported encoding format\n");
@@ -291,22 +296,22 @@ int transcoder_entry(
 #endif
 
     // Init & print out format-specific info
-    if (ENC_FORMAT == ASTC)
+    if ((ENC_FORMAT == ASTC) || (ENC_FORMAT == ASTC_INT))
     {
+        if (ENC_FORMAT == ASTC_INT)
+        {
+            LOGI("WARNING: Using integer arithmetic. Floating point precision is ignored.");
+        }
         LOGI("WARNING: ASTC decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
                " directory.\n");
+        LOGI("ASTC is compiled with ASTC_SELECT_DIAG=%d\n", ASTC_SELECT_DIAG);
+        LOGI("ASTC is compiled with ASTC_TRIM_ENDPOINTS=%d\n", ASTC_TRIM_ENDPOINTS);
     }
 
     if (ENC_FORMAT == BC1)
     {
         LOGI("BC1 is compiled with BC1_SELECT_DIAG=%d\n", BC1_SELECT_DIAG);
-    }
-
-    if (ENC_FORMAT == ASTC)
-    {
-        LOGI("ASTC is compiled with ASTC_SELECT_DIAG=%d\n", ASTC_SELECT_DIAG);
-        LOGI("ASTC is compiled with ASTC_TRIM_ENDPOINTS=%d\n", ASTC_TRIM_ENDPOINTS);
     }
 
     LOGI("\n");
@@ -387,7 +392,7 @@ int transcoder_entry(
         }
 
         // Save result file into out_dir
-        if (ENC_FORMAT == ASTC)
+        if ((ENC_FORMAT == ASTC) || (ENC_FORMAT == ASTC_INT))
         {
             std::string out_name = out_dir
                 / fs::path(inp_name).filename().replace_extension(".astc");

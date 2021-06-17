@@ -97,7 +97,7 @@ if __name__ == '__main__':
         columns=['x', 'sc', 'scfi', 'xfi', 'gt', 'flt_newt', 'fi_newt'])
     print(df)
 
-    nums = [0.01, 0.1, 0.2, 0.25, 0.4, 0.49, 0.5, 1.0, 128.0]
+    nums = [8.0 / 255.0 / 16.0]
     fi = fixed(nums, w=16, f=8)
     print(nums)
     print(fi)

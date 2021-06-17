@@ -87,6 +87,12 @@ namespace astc {
         uint32_t out[4]
     );
 
+    /* Encode a block of pixels into the ASTC format using integer arithmetic */
+    void encode_block_int(
+        const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
+        uint32_t out[4]
+    );
+
 }
 
 /******************************************************************************

@@ -11,10 +11,11 @@ typedef enum enc_format_t {
     BC1,
     YCOCG_BC3,
     ASTC,
+    ASTC_INT,
 } enc_format_t;
 
 /* Define encoding format here */
-constexpr enc_format_t ENC_FORMAT = ASTC;
+constexpr enc_format_t ENC_FORMAT = ASTC_INT;
 
 /* Pad image so that width and height are divisible by 4
  *

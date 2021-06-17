@@ -9,6 +9,8 @@
 
 #include "simple_texcomp.hpp"
 
+// TODO: It's growing out of hand, should be templated
+
 namespace simple {
 
 /* Endpoint interpolation constants */
@@ -163,6 +165,46 @@ struct Vec3i
     }
 };
 
+struct Vec3u8
+{
+    uint8_t x;
+    uint8_t y;
+    uint8_t z;
+
+    inline Vec3u8 operator>>(uint8_t nbits) const
+    {
+        return Vec3u8 {
+            static_cast<uint8_t>(x >> nbits),
+            static_cast<uint8_t>(y >> nbits),
+            static_cast<uint8_t>(z >> nbits),
+        };
+    }
+
+    inline bool operator==(const Vec3u8 &other) const
+    {
+        return (x == other.x) && (y == other.y) && (z == other.z);
+    }
+
+    inline Vec3u8 operator-(const Vec3u8 &other) const
+    {
+        // can and will overflow
+        return Vec3u8 {
+            static_cast<uint8_t>(x - other.x),
+            static_cast<uint8_t>(y - other.y),
+            static_cast<uint8_t>(z - other.z),
+        };
+    }
+
+    // inline Vec3u8 operator-(uint8_t a) const
+    // {
+    //     return Vec3u8 {
+    //         static_cast<uint8_t>(x - a),
+    //         static_cast<uint8_t>(y - a),
+    //         static_cast<uint8_t>(z - a),
+    //     };
+    // }
+};
+
 inline decimal fclamp(decimal a, decimal amin, decimal amax)
 {
     const decimal min = a < amin ? amin : a;
@@ -193,6 +235,28 @@ inline decimal fmin(decimal a, decimal b)
 }
 
 inline decimal fmax(decimal a, decimal b)
+{
+    if (a > b)
+    {
+        return a;
+    } else
+    {
+        return b;
+    }
+}
+
+inline uint8_t u8min(uint8_t a, uint8_t b)
+{
+    if (a < b)
+    {
+        return a;
+    } else
+    {
+        return b;
+    }
+}
+
+inline uint8_t u8max(uint8_t a, uint8_t b)
 {
     if (a > b)
     {
@@ -239,6 +303,15 @@ inline Vec3i clamp3i(const Vec3i &a, int amin, int amax)
     };
 }
 
+inline Vec3u8 clamp3u8(const Vec3u8 &a, uint8_t amin, uint8_t amax)
+{
+    return Vec3u8 {
+        u8clamp(a.x, amin, amax),
+        u8clamp(a.y, amin, amax),
+        u8clamp(a.z, amin, amax),
+    };
+}
+
 inline Vec2f clamp2f(const Vec2f &a, decimal amin, decimal amax)
 {
     return Vec2f {
@@ -280,6 +353,54 @@ inline decimal distsq2f(const Vec2f &a, const Vec2f &b)
 inline uint32_t froundu(decimal a)
 {
     return (uint32_t)(a + F(0.5));
+}
+
+inline Vec3u8 satadd(const Vec3u8 &inp, const Vec3u8 &other)
+{
+    uint8_t x = inp.x + other.x;
+    uint8_t y = inp.y + other.y;
+    uint8_t z = inp.z + other.z;
+
+    if (x < inp.x)
+    {
+        x = 255;
+    }
+
+    if (y < inp.y)
+    {
+        y = 255;
+    }
+
+    if (z < inp.z)
+    {
+        z = 255;
+    }
+
+    return Vec3u8 { x, y, z };
+}
+
+inline Vec3u8 satsub(const Vec3u8 &inp, const Vec3u8 &other)
+{
+    uint8_t x = inp.x - other.x;
+    uint8_t y = inp.y - other.y;
+    uint8_t z = inp.z - other.z;
+
+    if (x > inp.x)
+    {
+        x = 0;
+    }
+
+    if (y > inp.y)
+    {
+        y = 0;
+    }
+
+    if (z > inp.z)
+    {
+        z = 0;
+    }
+
+    return Vec3u8 { x, y, z };
 }
 
 }  // namespace simple
