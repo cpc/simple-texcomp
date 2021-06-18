@@ -46,18 +46,36 @@ def fixed(x, s=0, w=16, f=8, rounding='round', overflow='saturate', fixed=True):
     return numfi(x, s=s, w=w, f=f, rounding=rounding, overflow=overflow, fixed=fixed)
 
 
+def scale(x):
+    res = np.zeros(x.shape, dtype=np.int8)
+
+    for i, xx in enumerate(x):
+        xx = xx.int
+
+        # Essentially, log2 computation, borrowed from:
+        # https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
+        log2x = (xx > 0xFF) << 3
+        xx >>= log2x
+
+        shift = (xx > 0xF ) << 2
+        xx >>= shift
+        log2x |= shift;
+
+        shift = (xx > 0x3 ) << 1
+        xx >>= shift
+        log2x |= shift
+
+        log2x |= (xx >> 1)
+
+        res[i] = 7 - log2x[0]
+
+    return res
+
+
 def approx_newton_fixed(x, n):
     # Scale x to be within [0.5, 1.0]
     x_sc = fixed(np.copy(x))
-    sc = np.zeros(x.shape, dtype=np.int8)
-    for i, xi in enumerate(x_sc):
-        while x_sc[i] < 0.5:
-            x_sc[i] = x_sc[i] << 1
-            sc[i] += 1
-
-        while x_sc[i] > 1.0:
-            x_sc[i] = x_sc[i] >> 1
-            sc[i] -= 1
+    sc = scale(x_sc)
 
     # Initial estimate
     A = fixed(32.0 / 17.0)
@@ -71,6 +89,7 @@ def approx_newton_fixed(x, n):
         y1 = fixed(2.0) * y0 - x_sc * y0 * y0
         y0 = y1
 
+    # Scale result back
     res = np.where(sc >= 0, y1 << sc, y1 >> -sc)
     return res, sc
 
@@ -89,15 +108,20 @@ if __name__ == '__main__':
     print('iterations: {}'.format(n_iter))
     approx, sc = approx_newton_float(x, n_iter)
 
-
     xfi = fixed(x)
     approxfi, scfi = approx_newton_fixed(xfi, n_iter)
 
-    df = pd.DataFrame(data=np.array([x, sc, scfi, xfi, gt, approx, approxfi]).T,
-        columns=['x', 'sc', 'scfi', 'xfi', 'gt', 'flt_newt', 'fi_newt'])
+    sc2 = get_sc(xfi)
+
+    df = pd.DataFrame(data=np.array([x, sc, scfi, sc2, xfi, xfi.bin_, gt, approx, approxfi]).T,
+        columns=['x', 'sc', 'scfi', 'sc2', 'xfi', 'xfib', 'gt', 'flt_newt', 'fi_newt'])
     print(df)
 
-    nums = [8.0 / 255.0 / 16.0]
+    nums = [
+        8.0 / 255.0 / 16.0,
+        32.0 / 17.0,
+        48.0 / 17.0,
+    ]
     fi = fixed(nums, w=16, f=8)
     print(nums)
     print(fi)
