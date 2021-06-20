@@ -300,7 +300,7 @@ int transcoder_entry(
     {
         if (ENC_FORMAT == ASTC_INT)
         {
-            LOGI("WARNING: Using integer arithmetic. Floating point precision is ignored.");
+            LOGI("WARNING: Using integer arithmetic. Floating point precision is ignored.\n");
         }
         LOGI("WARNING: ASTC decoding is not supported. Instead,"
                " encoded images are saved as .astc files in the output"
