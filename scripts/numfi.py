@@ -9,6 +9,7 @@
 import numpy as np
 import warnings
 
+
 def quantize(array, signed, n_word, n_frac, rounding, overflow):
     bound = 2**(n_word-n_frac-(1 if signed else 0))
     upper = bound - 2**-n_frac
@@ -55,7 +56,9 @@ def quantize(array, signed, n_word, n_frac, rounding, overflow):
 
     return array
 
+
 class numfi(np.ndarray):
+
     #region initialization
     def __new__(cls, input_array=[], s=None, w=None, f=None, **kwargs):
         like = input_array if isinstance(input_array, numfi) and kwargs.get('like',None) is None else kwargs.get('like',None)
@@ -90,6 +93,7 @@ class numfi(np.ndarray):
         self._fixed = getattr(obj, 'fixed', False)
         self._inplace = False
     #endregion initialization
+
     #region read only property
     s           = property(lambda self: self._s)
     w           = property(lambda self: self._w)
@@ -111,6 +115,7 @@ class numfi(np.ndarray):
         view.flags.writeable = False # ndarray is read only to avoid undesired modify
         return view
     #endregion property
+
     #region methods
     def base_repr(self, base=2, frac_point=False): # return ndarray with same shape and dtype = '<Uw' where w=self.w
         if base == 2:
@@ -126,6 +131,7 @@ class numfi(np.ndarray):
         kwargs['like'] = self if kwargs.get('like') is None else kwargs.get('like')
         return numfi(self,*args, **kwargs)
     #endregion methods
+
     #region overload method
     def __repr__(self):
         signed = 's' if self.s else 'u'
@@ -137,6 +143,7 @@ class numfi(np.ndarray):
         quantized = quantize(item, self.s, self.w, self.f, self.rounding, self.overflow)
         super().__setitem__(key,quantized)
     #endregion overload method
+
     #region overload arithmetic operators
     def __fixed_arithmetic__(self, func, y):
         y_fi = y if isinstance(y, numfi) else numfi(y, like=self)

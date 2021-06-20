@@ -92,7 +92,7 @@ def approx_newton_fixed(x, n):
 
     # Scale result back
     res = np.where(sc >= 0, y1 << sc, y1 >> -sc)
-    return res, sc
+    return res, sc, x_sc
 
 
 if __name__ == '__main__':
@@ -102,7 +102,8 @@ if __name__ == '__main__':
     step = 16
     series = np.arange(1, n, step)
 
-    x = series / 256
+    #  x = series / 256
+    x = np.array([0.4039370120])
     gt = 1.0 / x
 
     n_iter = 2
@@ -110,21 +111,26 @@ if __name__ == '__main__':
     approx, sc = approx_newton_float(x, n_iter)
 
     xfi = fixed(x)
-    approxfi, scfi = approx_newton_fixed(xfi, n_iter)
+    approxfi, scfi, x_sc = approx_newton_fixed(xfi, n_iter)
 
-    df = pd.DataFrame(data=np.array([x, sc, scfi, xfi, xfi.bin_, gt, approx, approxfi]).T,
-        columns=['x', 'sc', 'scfi', 'xfi', 'xfib', 'gt', 'flt_newt', 'fi_newt'])
+    df = pd.DataFrame(data=np.array([x, sc, scfi, xfi, xfi.bin_, x_sc, gt, approx, approxfi, fixed(approxfi).int]).T,
+        columns=['x', 'sc', 'scfi', 'xfi', 'xfib', 'x_sc', 'gt', 'flt_newt', 'fi_newt', 'fi_newt_int'])
     print(df)
 
+    A = 32.0 / 17.0
+    B = 48.0 / 17.0
     nums = [
-        8.0 / 255.0 / 16.0,
-        32.0 / 17.0,
-        48.0 / 17.0,
+        0.4039370120,
+        0.4039370120 * 2.0,
+        A,
+        B,
+        B - A * 0.4039370120 * 2.0,
     ]
-    fi = fixed(nums, w=16, f=8)
+    fi = fixed(nums, s=0, w=16, f=8)
     print(nums)
     print(fi)
     print(fi.bin)
     print(fi.bin_)
+    print(fi.int)
     print(fi.hex)
     print(fi.precision)

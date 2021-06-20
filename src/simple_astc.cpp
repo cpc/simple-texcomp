@@ -184,6 +184,13 @@ void print_minmax(const char *pre, Vec3u8 mincol, Vec3u8 maxcol)
     printf("%*s maxcol: %3d %3d %3d\n", l, "", maxcol.x, maxcol.y, maxcol.z);
 }
 
+void print_minmax(const char *pre, Vec3u8 mincol, Vec3u16 maxcol)
+{
+    int l = strlen(pre);
+    printf("%*s mincol: %3d %3d %3d\n", l, pre, mincol.x, mincol.y, mincol.z);
+    printf("%*s maxcol: %3d %3d %3d\n", l, "", maxcol.x, maxcol.y, maxcol.z);
+}
+
 
 // Taken from astcenc:
 // routine to write up to 8 bits
@@ -396,10 +403,10 @@ Vec3i quantize_5b(Vec3f *vec)
 
 Vec3u8 quantize_5b_u8(Vec3u8 *vec)
 {
-    // TODO: rounding?
-    uint8_t quant_x = vec->x >> 3;
-    uint8_t quant_y = vec->y >> 3;
-    uint8_t quant_z = vec->z >> 3;
+    // TODO: rounding
+    uint8_t quant_x = rshift_round(vec->x, 3);
+    uint8_t quant_y = rshift_round(vec->y, 3);
+    uint8_t quant_z = rshift_round(vec->z, 3);
 
     uint8_t dequant_x = (quant_x << 3) | (quant_x >> 2);
     uint8_t dequant_y = (quant_y << 3) | (quant_y >> 2);
@@ -410,6 +417,58 @@ Vec3u8 quantize_5b_u8(Vec3u8 *vec)
     vec->z = dequant_z;
 
     return Vec3u8 { quant_x, quant_y, quant_z };
+}
+
+/** Approximate 1/x
+ *
+ * Using Newton-Raphson method
+ * Assuming x is in Q16.8 format
+ */
+uint16_t approx_inv(uint16_t x)
+{
+    uint16_t xx = x;
+
+    // First, scale the input to be within [0.5, 1.0]
+    int8_t scale = (xx > 0xff) << 3;
+    xx >>= scale;
+
+    uint16_t shift = (xx > 0xf ) << 2;
+    xx >>= shift;
+    scale |= shift;
+
+    shift = (xx > 0x3 ) << 1;
+    xx >>= shift;
+    scale |= shift;
+
+    scale |= (xx >> 1);
+    scale = 7 - scale;
+
+    const uint16_t shl = (scale < 0) ?      0 : scale;
+    const uint16_t shr = (scale < 0) ? -scale :     0;
+    const uint16_t x_sc = rshift_round(x << shl, shr);
+
+    printf("x_orig: %d, scale: %d, x_sc: %d, x_sc_bin: ", x, scale, x_sc);
+    print_bin(x_sc, 8);
+    printf("\n");
+
+    // Then, compute the initial estimate
+    constexpr uint16_t A = 0x01e2;  // 32.0 / 17.0  Q16.8
+    constexpr uint16_t B = 0x02d3;  // 48.0 / 17.0  Q16.8
+    const uint16_t init = B - rshift_round(A * x_sc, 8);
+    printf("A: %d, B: %d  \n", A, B);
+    printf("init: %d  ", init);
+    print_bin(init, 16);
+    printf("\n");
+
+    // Newthon-Raphson iterations
+    uint32_t y0 = init;
+    uint32_t y1 = init;
+    y1 = (y0 << 1) - rshift_round(x_sc * y0 * y0, 16);  // 1st
+    y0 = y1;
+    y1 = (y0 << 1) - rshift_round(x_sc * y0 * y0, 16);  // 2nd
+
+    // The result is scaled down now, we need to scale it back
+    return rshift_round(y1 << shl, shr);
 }
 
 void encode_block(
@@ -553,6 +612,22 @@ void encode_block(
 
         // Move the endpoints line segment such that mincol is at zero
         Vec3f ep_vec = maxcol - mincol;
+        printf("    ep_vec: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+            (double)ep_vec.x, (double)ep_vec.y, (double)ep_vec.z,
+            (double)(ep_vec.x * F(255.0)),
+            (double)(ep_vec.y * F(255.0)),
+            (double)(ep_vec.z * F(255.0))
+        );
+
+        decimal ep_dot = ep_vec.dot(ep_vec);
+        printf("    ep_dot: %5.3f              %3.0f\n",
+            (double)ep_dot, (double)(ep_dot * F(255.0))
+        );
+
+        decimal inv_ep_dot = F(1.0) / ep_vec.dot(ep_vec);
+        printf("inv_ep_dot: %5.3f              %3.0f\n",
+            (double)inv_ep_dot, (double)(inv_ep_dot * F(255.0))
+        );
 
         // To get projection of pixel onto ep_vec, we have to normalize. Second
         // normalization is for keeping the value between 0 and 1 =>
@@ -560,6 +635,12 @@ void encode_block(
         // With just 1 / sqrt(dot), the projected values in the following loop
         // would be between 0 and |ep_vec|.
         Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
+        printf(" ep_vec_sc: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+            (double)ep_vec_scaled.x, (double)ep_vec_scaled.y, (double)ep_vec_scaled.z,
+            (double)(ep_vec_scaled.x * F(255.0)),
+            (double)(ep_vec_scaled.y * F(255.0)),
+            (double)(ep_vec_scaled.z * F(255.0))
+        );
 
         // Project all pixels onto the endpoint vector. For each pixel, the result
         // tells how far it goes into the endpoint vector direction. Small values
@@ -790,6 +871,43 @@ void encode_block_int(
             quantized_weights[i] = 0;
         }
     } else {
+        // Downsample and quantize the weights
+        uint8_t downsampled_weights[MAX_PIXEL_COUNT];
+
+        // Move the endpoints line segment such that mincol is at zero
+        Vec3u8 ep_vec = maxcol - mincol;
+
+        // Projection of pixels onto ep_vec to get the ideal weights
+        uint16_t ep_dot = ep_vec.dotfi(ep_vec);     // Q16.14
+        printf("        ep: %3d %3d %3d\n", ep_vec.x, ep_vec.y, ep_vec.z);
+        printf("    ep_dot: %3d \n", ep_dot);
+        ep_dot = rshift_round(ep_dot, 6); // Q16.8 with rounding
+        printf("    ep_dot: %3d \n", ep_dot);
+        uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec)
+        Vec3u16 ep_vec_scaled = {
+            (uint16_t)(rshift_round(ep_vec.x * inv_ep_dot, 8)),
+            (uint16_t)(rshift_round(ep_vec.y * inv_ep_dot, 8)),
+            (uint16_t)(rshift_round(ep_vec.z * inv_ep_dot, 8)),
+        };
+        printf("inv_ep_dot: %d\n", inv_ep_dot);
+        printf("     ep_sc: %3d %3d %3d\n", ep_vec_scaled.x, ep_vec_scaled.y, ep_vec_scaled.z);
+        print_bin(ep_dot, 8);
+        printf("\n");
+
+        uint8_t ideal_weights[MAX_PIXEL_COUNT];
+        for (int i = 0; i < pixel_count; ++i)
+        {
+            // clamp is necessary because the min/max values shrank inwards due
+            // to inset / quantization but the pixels didn't
+            Vec3u8 diff = satsub(block_u8[i], mincol);
+            Vec3u16 diff_u16 = {
+                (uint16_t)(diff.x),
+                (uint16_t)(diff.y),
+                (uint16_t)(diff.z),
+            };
+            ideal_weights[i] = (uint8_t)(diff_u16.dotfi(ep_vec_scaled));
+            // TODO: saturate
+        }
     }
 }
 

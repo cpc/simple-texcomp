@@ -195,14 +195,35 @@ struct Vec3u8
         };
     }
 
-    // inline Vec3u8 operator-(uint8_t a) const
-    // {
-    //     return Vec3u8 {
-    //         static_cast<uint8_t>(x - a),
-    //         static_cast<uint8_t>(y - a),
-    //         static_cast<uint8_t>(z - a),
-    //     };
-    // }
+    inline uint16_t dotfi(const Vec3u8 &other) const
+    {
+        // Dot product assuming fixed precision
+        // Keeps the multiplication precision but rounds the bits added by +
+        uint32_t xx = x * other.x;
+        uint32_t yy = y * other.y;
+        uint32_t zz = z * other.z;
+
+        // max. possible value is 255*255*3 = 0b10.1111101000000011 (Q18.16)
+        return (uint16_t)((xx + yy + zz) >> 2);  // round off the two additions
+    }
+};
+
+struct Vec3u16
+{
+    uint16_t x;
+    uint16_t y;
+    uint16_t z;
+
+    inline uint16_t dotfi(const Vec3u16 &other) const
+    {
+        // Dot product assuming fixed precision
+        // Keeps the multiplication precision but rounds the bits added by +
+        uint32_t xx = x * other.x;
+        uint32_t yy = y * other.y;
+        uint32_t zz = z * other.z;
+
+        return (uint16_t)((xx + yy + zz) >> 2);  // round off the two additions
+    }
 };
 
 inline decimal fclamp(decimal a, decimal amin, decimal amax)
@@ -401,6 +422,12 @@ inline Vec3u8 satsub(const Vec3u8 &inp, const Vec3u8 &other)
     }
 
     return Vec3u8 { x, y, z };
+}
+
+template<typename T, typename U>
+inline T rshift_round(T x, U n)
+{
+    return (x >> n) + ((x >> (n - 1)) & 1);
 }
 
 }  // namespace simple
