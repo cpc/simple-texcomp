@@ -15,7 +15,10 @@ typedef enum enc_format_t {
 } enc_format_t;
 
 /* Define encoding format here */
-constexpr enc_format_t ENC_FORMAT = ASTC_INT;
+#ifndef ENC_FORMAT_DEF
+#define ENC_FORMAT_DEF ASTC
+#endif
+constexpr enc_format_t ENC_FORMAT = ENC_FORMAT_DEF;
 
 /* Pad image so that width and height are divisible by 4
  *

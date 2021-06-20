@@ -87,6 +87,17 @@ if get_option('diagnostics')
   ]
 endif
 
+format = get_option('format')
+if format == 'bc1'
+  add_project_arguments('-DENC_FORMAT_DEF=BC1', language: 'cpp')
+elif format == 'ycocg_bc3'
+  add_project_arguments('-DENC_FORMAT_DEF=YCOCG_BC3', language: 'cpp')
+elif format == 'astc_int'
+  add_project_arguments('-DENC_FORMAT_DEF=ASTC_INT', language: 'cpp')
+else
+  add_project_arguments('-DENC_FORMAT_DEF=ASTC', language: 'cpp')
+endif
+
 includes = include_directories('src')
 stb_includes = include_directories('extern/stb', is_system: true)
 ghc_includes = include_directories('extern/ghc', is_system: true)
