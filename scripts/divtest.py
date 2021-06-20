@@ -76,6 +76,7 @@ def approx_newton_fixed(x, n):
     # Scale x to be within [0.5, 1.0]
     x_sc = fixed(np.copy(x))
     sc = scale(x_sc)
+    x_sc = np.where(sc >= 0, x_sc << sc, x_sc >> -sc)
 
     # Initial estimate
     A = fixed(32.0 / 17.0)
@@ -111,10 +112,8 @@ if __name__ == '__main__':
     xfi = fixed(x)
     approxfi, scfi = approx_newton_fixed(xfi, n_iter)
 
-    sc2 = get_sc(xfi)
-
-    df = pd.DataFrame(data=np.array([x, sc, scfi, sc2, xfi, xfi.bin_, gt, approx, approxfi]).T,
-        columns=['x', 'sc', 'scfi', 'sc2', 'xfi', 'xfib', 'gt', 'flt_newt', 'fi_newt'])
+    df = pd.DataFrame(data=np.array([x, sc, scfi, xfi, xfi.bin_, gt, approx, approxfi]).T,
+        columns=['x', 'sc', 'scfi', 'xfi', 'xfib', 'gt', 'flt_newt', 'fi_newt'])
     print(df)
 
     nums = [
