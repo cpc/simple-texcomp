@@ -8,6 +8,7 @@ import numpy as np
 # https://github.com/ZZZZzzzzac/numfi
 from numfi import numfi
 
+from matplotlib import pyplot as plt
 
 def approx_newton_float(x, n):
     #  if x == 0.0:
@@ -95,6 +96,119 @@ def approx_newton_fixed(x, n):
     return res, sc, x_sc
 
 
+def limits():
+    mins = [
+        np.array([0.0, 0.0, 0.0]),
+        np.array([0.0, 0.0, 0.0]),
+    ]
+
+    maxs = [
+        np.array([1 / 32, 0.0, 0.0]),
+        np.array([1.0, 1.0, 1.0]),
+    ]
+
+    pxs = [
+        np.array([1.0, 1.0, 1.0]),
+    ]
+
+    dcols = [
+        'ep[0]',
+        'dp',
+        'inv_dp',
+        'ep_sc[0]',
+        'ep_sc2[0]',
+        'diff_dp',
+        'diff_dp2',
+    ]
+
+    print('Precise')
+    d = pd.DataFrame(columns=dcols)
+
+    for mn, mx in zip(mins, maxs):
+        ep = mx - mn
+        dp = ep.dot(ep)
+        inv_dp = 1 / dp
+        ep_sc = ep * inv_dp
+        ep_sc2 = (ep * inv_dp) / 32
+
+        for px in pxs:
+            diff = px - mn
+            diff_dp = diff.dot(ep_sc)
+            diff_dp2 = diff.dot(ep_sc2)
+            dnew = pd.DataFrame(
+                [[ ep[0], dp, inv_dp, ep_sc[0], ep_sc2[0], diff_dp, diff_dp2 ]],
+                columns=dcols,
+            )
+            d = d.append(dnew, ignore_index=True)
+    print(d)
+
+    print('\nFixed point')
+    mins = [ numfi(mn, s=0, w=8, f=8, rounding='floor', overflow='saturate', fixed=True) for mn in mins ]
+    maxs = [ numfi(mx, s=0, w=8, f=8, rounding='floor', overflow='saturate', fixed=True) for mx in maxs ]
+    d = pd.DataFrame(columns=dcols)
+    print('Min:', mins)
+    print('Max:', maxs)
+    print('{:>19s} {:>19s} {:>19s}  {:>19s}  {:>19s}'.format('ep[0]', 'dp', 'inv_dp', 'ep_sc[0]', 'ep_sc2[0]'))
+
+    for mn, mx in zip(mins, maxs):
+        ep = (mx - mn).requantize(w=16, overflow='wrap')
+        dp = numfi(ep.dot(ep), s=0, w=21, f=10, rounding='floor', overflow='wrap', fixed=True)
+        inv_dp = 1 / dp
+        ep_sc = ep * inv_dp
+        ep_sc2 = (ep * inv_dp) >> 5
+
+        print('{:>19s}  {:>19s}  {:>19s}  {:>19s}  {:>19s}'.format(ep.bin_[0], dp.bin_[0], inv_dp.bin_[0], ep_sc.bin_[0], ep_sc2.bin_[0]))
+
+        _ep = ep[0].precision * ep[0].int
+        _ep_sc = ep_sc[0].precision * ep_sc[0].int
+        _ep_sc2 = ep_sc2[0].precision * ep_sc2[0].int
+        _dp = dp[0].precision * dp[0].int
+        _inv_dp = inv_dp[0].precision * inv_dp[0].int
+
+        for px in pxs:
+            diff = px - mn
+            diff_dp = diff.dot(ep_sc)
+            diff_dp2 = diff.dot(ep_sc2)
+            dnew = pd.DataFrame(
+                [[ _ep[0], _dp, _inv_dp, _ep_sc[0], _ep_sc2[0], diff_dp, diff_dp2 ]],
+                columns=dcols,
+            )
+            d = d.append(dnew, ignore_index=True)
+
+    print()
+    print(d)
+
+    print()
+    s = np.linspace(0, 31, 32) / 32
+    r = np.zeros([32*32*32, 3])
+    i = 0
+    for x in s:
+        for y in s:
+            for z in s:
+                r[i] = np.array([x, y, z])
+                i += 1
+    mask = np.logical_not(r.any(axis=1))  # delete zeroes
+    r = np.delete(r, mask, axis=0)
+    dp = np.square(r).sum(axis=1)
+    inv_dp = 1/dp
+
+    sorted_inv_dp = np.sort(inv_dp)
+    nbins = 2
+    chunks = np.array_split(sorted_inv_dp, nbins)
+    for chunk in chunks:
+        print('chunk: {} -- {} ({})'.format(np.min(chunk), np.max(chunk), len(chunk)))
+
+    lt = inv_dp[inv_dp <= 1.0]
+    gt = inv_dp[inv_dp > 1.0]
+
+    print('less than one: {} -- {} ({})'.format(np.min(lt), np.max(lt), len(lt)))
+    print('more than one: {} -- {} ({})'.format(np.min(gt), np.max(gt), len(gt)))
+
+    plt.scatter(inv_dp, np.zeros_like(inv_dp), s=1)
+    plt.scatter(dp, np.ones_like(inv_dp), s=1)
+    plt.show()
+
+
 if __name__ == '__main__':
     pd.set_option("display.precision", 10)
 
@@ -102,8 +216,7 @@ if __name__ == '__main__':
     step = 16
     series = np.arange(1, n, step)
 
-    #  x = series / 256
-    x = np.array([0.4039370120])
+    x = np.arange(1.0/(32.0*32.0), 3.0, 1.0/16.0)
     gt = 1.0 / x
 
     n_iter = 2
@@ -126,7 +239,7 @@ if __name__ == '__main__':
         B,
         B - A * 0.4039370120 * 2.0,
     ]
-    fi = fixed(nums, s=0, w=16, f=8)
+    fi = fixed(nums, s=0, w=17, f=15)
     print(nums)
     print(fi)
     print(fi.bin)
@@ -134,3 +247,6 @@ if __name__ == '__main__':
     print(fi.int)
     print(fi.hex)
     print(fi.precision)
+
+    print()
+    limits()
