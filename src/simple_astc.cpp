@@ -161,6 +161,20 @@ void print_bin(unsigned int num, unsigned int nb)
 	}
 }
 
+void print_bin_(unsigned int num, unsigned int nb, unsigned int frac)
+{
+    unsigned int dec_point = nb - frac;
+	for (uint b = 0; b < nb; ++b)
+	{
+        if (b == dec_point)
+        {
+            printf(".");
+        }
+		unsigned int x = (num >> (nb-1-b)) & 1;
+		printf("%d", x);
+	}
+}
+
 void print_minmax(const char *pre, Vec3f mincol, Vec3f maxcol)
 {
     Vec3f mincol2 = mincol * F(255.0);
@@ -421,8 +435,9 @@ Vec3u8 quantize_5b_u8(Vec3u8 *vec)
 
 /** Approximate 1/x
  *
+ * TODO: this only scales to 256 but need to support result up to 1024
  * Using Newton-Raphson method
- * Assuming x is in Q16.8 format
+ * Assuming x is in Q8.8 format
  */
 uint16_t approx_inv(uint16_t x)
 {
@@ -452,8 +467,8 @@ uint16_t approx_inv(uint16_t x)
     printf("\n");
 
     // Then, compute the initial estimate
-    constexpr uint16_t A = 0x01e2;  // 32.0 / 17.0  Q16.8
-    constexpr uint16_t B = 0x02d3;  // 48.0 / 17.0  Q16.8
+    constexpr uint16_t A = 0x01e2;  // 32.0 / 17.0  Q8.8
+    constexpr uint16_t B = 0x02d3;  // 48.0 / 17.0  Q8.8
     const uint16_t init = B - rshift_round(A * x_sc, 8);
     printf("A: %d, B: %d  \n", A, B);
     printf("init: %d  ", init);
@@ -468,6 +483,67 @@ uint16_t approx_inv(uint16_t x)
     y1 = (y0 << 1) - rshift_round(x_sc * y0 * y0, 16);  // 2nd
 
     // The result is scaled down now, we need to scale it back
+    return rshift_round(y1 << shl, shr);
+}
+
+ /* Assuming x is in Q2.16 format */
+uint32_t approx_inv32(uint32_t x)
+{
+    uint32_t xx = x;
+
+    // First, scale the input to be within [0.5, 1.0]
+    int32_t scale = (xx > 0xff) << 3;
+    xx >>= scale;
+
+    uint32_t shift = (xx > 0xf ) << 2;
+    xx >>= shift;
+    scale |= shift;
+
+    shift = (xx > 0x3 ) << 1;
+    xx >>= shift;
+    scale |= shift;
+
+    scale |= (xx >> 1);  // now, scale is log2(x)
+    scale = 7 - scale;
+
+    const uint32_t shl = (scale < 0) ?      0 : scale;
+    const uint32_t shr = (scale < 0) ? -scale :     0;
+    const uint32_t x_sc = rshift_round(x << shl, shr+1); // x_sc in 0.5--1.0, so Q0.16 -> Q0.15
+
+    printf("x_orig: %d, scale: %d, x_sc: %d, x_sc_bin: ", x, scale, x_sc);
+    print_bin(x_sc, 8);
+    printf("\n");
+
+    // Then, compute the initial estimate
+    constexpr uint32_t A = 0xF0F1; // 32.0 / 17.0  Q2.15
+    constexpr uint32_t B = 0xB4B4B4B5; // 48.0 / 17.0  Q2.30
+    // constexpr uint32_t B = rshift_round(0x2d2d3, 1); // 48.0 / 17.0  Q2.16 -> Q2.15
+    const uint32_t A_x_sc = A * x_sc; // Q4.30 but x_sc is <= 1 so the two MSB are unused => Q2.30
+    const uint32_t init = B - A_x_sc;  // Q2.30 - Q2.30 = Q3.30 -> Q2.30 (won't overflow)
+    printf("A: %d, B: %d  \n", A, B);
+    printf("init: %d  ", init);
+    print_bin(init, 16);
+    printf("\n");
+
+    // Newthon-Raphson iterations
+    // 1st
+    uint32_t y0 = rshift_round(init, 15);       // Q2.15
+    uint32_t y00 = rshift_round(init, 1);       // Q2.29
+    uint32_t tmp = rshift_round(x_sc * y0, 15); // Q0.15 * Q2.15 = Q2.30 -> Q2.15
+    tmp = rshift_round(tmp * y0, 15);           // Q2.15 * Q2.15 = Q4.30 but the value never goes >2 => Q2.30
+    uint32_t y1 = (y00 << 1) - tmp;             // Q2.29 << 1 - Q2.30 = Q3.30 but won't increase => Q2.30
+    // 2nd
+    y0 = rshift_round(y1, 15);                  // Q2.15
+    y00 = rshift_round(y1, 1);                  // Q2.29
+    tmp = rshift_round(x_sc * y0, 15);          // Q0.15 * Q2.15 = Q2.30 -> Q2.15
+    tmp = rshift_round(tmp * y0, 15);           // Q2.15 * Q2.15 = Q4.30 but the value never goes >2 => Q2.30
+    y1 = (y00 << 1) - tmp;                      // Q2.29 << 1 - Q2.30 = Q3.30 but won't increase => Q2.30
+
+    // y1 = (y0 << 1) - rshift_round(x_sc * y0 * y0, 16);  // 2nd
+
+    // The result is scaled down now, we need to scale it back
+    // TODO: must hold value up to 1024
+    // TODO: do not output 1024 but 1023.999999... to save one bit
     return rshift_round(y1 << shl, shr);
 }
 
@@ -512,9 +588,9 @@ void encode_block(
         #pragma clang loop interleave_count(2)
 #endif  // ANDROID
         for (int i = 0; i < pixel_count; ++i) {
-            block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(255.0);
-            block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(255.0);
-            block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(255.0);
+            block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(256.0);
+            block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(256.0);
+            block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(256.0);
 
             tmp_min[0] = fmin(tmp_min[0], block_flt[i].x);
             tmp_min[1] = fmin(tmp_min[1], block_flt[i].y);
@@ -568,7 +644,7 @@ void encode_block(
     //     print_minmax("swp", mincol, maxcol);
     // }
 #endif  // ASTC_SELECT_DIAG == 1
-    inset_bbox(&mincol, &maxcol);
+    // inset_bbox(&mincol, &maxcol);
     print_minmax("ins", mincol, maxcol);
 
     // Quantize endpoints
@@ -620,13 +696,13 @@ void encode_block(
         );
 
         decimal ep_dot = ep_vec.dot(ep_vec);
-        printf("    ep_dot: %5.3f              %3.0f\n",
-            (double)ep_dot, (double)(ep_dot * F(255.0))
+        printf("    ep_dot:   %15.10f  %6.0f\n",
+            (double)(ep_dot), (double)(ep_dot * F(255.0))
         );
 
         decimal inv_ep_dot = F(1.0) / ep_vec.dot(ep_vec);
-        printf("inv_ep_dot: %5.3f              %3.0f\n",
-            (double)inv_ep_dot, (double)(inv_ep_dot * F(255.0))
+        printf("inv_ep_dot:   %15.10f  %6.0f\n",
+            (double)(inv_ep_dot), (double)(inv_ep_dot * F(255.0))
         );
 
         // To get projection of pixel onto ep_vec, we have to normalize. Second
@@ -649,6 +725,7 @@ void encode_block(
         // In other words, the resulting array is the array of ideal weights,
         // assuming there is no quantization.
         decimal ideal_weights[MAX_PIXEL_COUNT];
+        printf("%10s  %10s  %10s\n", "inp", "diff", "dot");
         for (int i = 0; i < pixel_count; ++i)
         {
             // clamp is necessary because the min/max values shrank inwards due
@@ -658,6 +735,13 @@ void encode_block(
                 F(0.0),
                 F(1.0)
             );
+
+            if (i < 2)
+            {
+                printf("%10.5f  %10.5f  %10.5f\n",
+                    (double)block_flt[i].x, (double)(block_flt[i].x - mincol.x),
+                    (double)ideal_weights[i]);
+            }
         }
 
         // We downsample the weight grid before quantization
@@ -850,9 +934,9 @@ void encode_block_int(
     print_minmax("   ", mincol, maxcol);
 
     // inset bounding box
-    Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/255th, too small
-    mincol = satadd(mincol, inset);
-    maxcol = satsub(maxcol, inset);
+    // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/255th, too small
+    // mincol = satadd(mincol, inset);
+    // maxcol = satsub(maxcol, inset);
     print_minmax("ins", mincol, maxcol);
 
     // Quantize endpoints
@@ -876,36 +960,94 @@ void encode_block_int(
 
         // Move the endpoints line segment such that mincol is at zero
         Vec3u8 ep_vec = maxcol - mincol;
+        printf("        ep: %3d %3d %3d\n", ep_vec.x, ep_vec.y, ep_vec.z);
 
         // Projection of pixels onto ep_vec to get the ideal weights
-        uint16_t ep_dot = ep_vec.dotfi(ep_vec);     // Q16.14
-        printf("        ep: %3d %3d %3d\n", ep_vec.x, ep_vec.y, ep_vec.z);
-        printf("    ep_dot: %3d \n", ep_dot);
-        ep_dot = rshift_round(ep_dot, 6); // Q16.8 with rounding
-        printf("    ep_dot: %3d \n", ep_dot);
-        uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec)
+
+        uint16_t ep_dot = ep_vec.dot16(ep_vec);     // Q2.14
+        // uint32_t ep_dot = ep_vec.dot32(ep_vec);     // Q2.16
+        printf("  ep_dot16: %3d \n", ep_dot);
+
+        ep_dot = rshift_round(ep_dot, 6); // Q8.8 with rounding
+        printf("   ep_dot8: %3d \n", ep_dot);
+
+        uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec), Q8.8
+        // uint32_t inv_ep_dot = approx_inv32(ep_dot);   // 1 / ep_vec.dot(ep_vec),
+        printf("inv_ep_dot: %d\n", inv_ep_dot);
+        print_bin_(inv_ep_dot, 32, 8);
+        printf("\n");
+
+        // TODO: finish approx_inv32() and remove this clutch
+        uint32_t inv_ep_dot32 = inv_ep_dot << 22; // Q10.22 (TODO: 1024 overflows, needs round)
+        printf("inv_dp_32: %d\n", inv_ep_dot32);
+        print_bin_(inv_ep_dot32, 32, 22);
+        printf("\n");
+
+        uint32_t ep_vec32_x = ep_vec.x << 14; // Q8.8 -> Q0.22
+        uint32_t ep_vec32_y = ep_vec.y << 14;
+        uint32_t ep_vec32_z = ep_vec.z << 14;
+        printf("ep.x:\n");
+        print_bin_(ep_vec.x, 32, 8);
+        printf("\n");
+        print_bin_(ep_vec32_x, 32, 22);
+        printf("\n");
+
         Vec3u16 ep_vec_scaled = {
             (uint16_t)(rshift_round(ep_vec.x * inv_ep_dot, 8)),
             (uint16_t)(rshift_round(ep_vec.y * inv_ep_dot, 8)),
             (uint16_t)(rshift_round(ep_vec.z * inv_ep_dot, 8)),
         };
-        printf("inv_ep_dot: %d\n", inv_ep_dot);
         printf("     ep_sc: %3d %3d %3d\n", ep_vec_scaled.x, ep_vec_scaled.y, ep_vec_scaled.z);
-        print_bin(ep_dot, 8);
-        printf("\n");
+
+        // this can be max. 32
+        // TODO: do not use 32 but next lowest value to save one bit (similar to 1024 earlier)
+        uint32_t ep_sc32_x = (ep_vec32_x >> 11) * (inv_ep_dot32 >> 11);  // Q0.11 * Q10.11 = Q10.22
+        uint32_t ep_sc32_y = (ep_vec32_y >> 11) * (inv_ep_dot32 >> 11);
+        uint32_t ep_sc32_z = (ep_vec32_z >> 11) * (inv_ep_dot32 >> 11);
+
+        // the numbers are within the range of 1/3 .. 32 which is exactly 8 bits
+        // this requires Q5.3 precision (to store the 31.99999)
+        // then, shift right to get Q0.8 (max. value 0.999999 instead of 31.999)
+        // Vec3u8 ep_vec_scaled8 = {
+        //     (uint8_t)(rshift_round(ep_sc32_x, 14+5)),
+        //     (uint8_t)(rshift_round(ep_sc32_y, 14+5)),
+        //     (uint8_t)(rshift_round(ep_sc32_z, 14+5)),
+        // };
+        // TODO: fix the above
+        // the following are Q5.3 but treated as Q0.8 (same as inp. pixels), need to be scaled later:
+        Vec3u8 ep_vec_scaled8 = {
+            (uint8_t)(31 << 3),
+            (uint8_t)(rshift_round(0b01010101, 5)),  // 1/3
+            (uint8_t)(0b11111111111111111 >> 5),     // 32-1/8
+        };
+        printf("    ep_sc8: %3d %3d %3d\n", ep_vec_scaled8.x, ep_vec_scaled8.y, ep_vec_scaled8.z);
+        print_bin_(ep_vec_scaled8.x, 8, 3); printf("\n");
+        print_bin_(ep_vec_scaled8.y, 8, 3); printf("\n");
+        print_bin_(ep_vec_scaled8.z, 8, 3); printf("\n");
+
+        // Vec3u8 ep_sc8_hi = {
+        //     // integer part
+        // };
+
+        // Vec3u8 ep_sc8_lo = {
+        //     // decimal part
+        // };
 
         uint8_t ideal_weights[MAX_PIXEL_COUNT];
         for (int i = 0; i < pixel_count; ++i)
         {
             // clamp is necessary because the min/max values shrank inwards due
             // to inset / quantization but the pixels didn't
-            Vec3u8 diff = satsub(block_u8[i], mincol);
-            Vec3u16 diff_u16 = {
-                (uint16_t)(diff.x),
-                (uint16_t)(diff.y),
-                (uint16_t)(diff.z),
-            };
-            ideal_weights[i] = (uint8_t)(diff_u16.dotfi(ep_vec_scaled));
+            // Vec3u8 diff = satsub(block_u8[i], mincol);
+            Vec3u8 diff = block_u8[i] - mincol;
+            // uint16_t res_hi = diff.dot(ep_sc8_hi) << 5;
+            // uint16_t res_lo = diff.dot(ep_sc8_lo);
+            // ideal_weights[i] = (uint8_t)(res_hi + res_lo);
+
+            // dot product: Q5.3 * Q0.8 + 3xADD = Q8.11, truncated to 5.11, should be within 0.11
+            uint16_t res = diff.dot(ep_vec_scaled8);
+            ideal_weights[i] = (uint8_t)(res >> 3);
+
             // TODO: saturate
         }
     }

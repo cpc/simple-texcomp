@@ -195,7 +195,26 @@ struct Vec3u8
         };
     }
 
-    inline uint16_t dotfi(const Vec3u8 &other) const
+    inline uint16_t dot(const Vec3u8 &other) const
+    {
+        // Arithmetic dot product, returns the 16 LSB of the result
+        uint32_t xx = x * other.x;
+        uint32_t yy = y * other.y;
+        uint32_t zz = z * other.z;
+
+        uint32_t res32 = xx + yy + zz;
+        uint16_t res16 = (uint16_t)(res32);
+
+        if (res32 != (uint32_t)(res16))
+        {
+            printf("WARNING: Dot product overflow! (%3d %3d %3d).(%3d %3d %3d)\n",
+                x, y, z, other.x, other.y, other.z);
+        }
+
+        return (uint16_t)(xx + yy + zz);
+    }
+
+    inline uint16_t dot16(const Vec3u8 &other) const
     {
         // Dot product assuming fixed precision
         // Keeps the multiplication precision but rounds the bits added by +
@@ -205,6 +224,18 @@ struct Vec3u8
 
         // max. possible value is 255*255*3 = 0b10.1111101000000011 (Q18.16)
         return (uint16_t)((xx + yy + zz) >> 2);  // round off the two additions
+    }
+
+    inline uint32_t dot32(const Vec3u8 &other) const
+    {
+        // Dot product assuming fixed precision
+        // Keeps the multiplication precision but rounds the bits added by +
+        uint32_t xx = x * other.x;
+        uint32_t yy = y * other.y;
+        uint32_t zz = z * other.z;
+
+        // max. possible value is 255*255*3 = 0b10.1111101000000011 (Q18.16)
+        return (uint32_t)(xx + yy + zz);  // return the full result
     }
 };
 
