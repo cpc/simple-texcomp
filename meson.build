@@ -142,3 +142,11 @@ executable(
   cpp_args: scalar_args,
   dependencies: deps,
 )
+
+executable(
+  'test-inv-div',
+  [ 'tests/inv_div.cpp' ],
+  include_directories: [ includes ],
+  cpp_args: vector_args,
+  dependencies: deps,
+)
