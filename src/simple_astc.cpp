@@ -800,8 +800,8 @@ void encode_block_int(
         ep_dot = rshift_round(ep_dot, 6); // Q8.8 with rounding
         printf("   ep_dot8: %3d \n", ep_dot);
 
-        uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec), Q8.8
-        // uint32_t inv_ep_dot = approx_inv32(ep_dot);   // 1 / ep_vec.dot(ep_vec),
+        // uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec), Q8.8
+        uint32_t inv_ep_dot = approx_inv32(ep_dot);   // 1 / ep_vec.dot(ep_vec),
         printf("inv_ep_dot: %d\n", inv_ep_dot);
         print_bin_(inv_ep_dot, 32, 8);
         printf("\n");

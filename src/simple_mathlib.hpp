@@ -521,72 +521,30 @@ inline void print_minmax(const char *pre, Vec3u8 mincol, Vec3u16 maxcol)
     printf("%*s maxcol: %3d %3d %3d\n", l, "", maxcol.x, maxcol.y, maxcol.z);
 }
 
-#endif // NDEBUG
-
-
-/** Approximate 1/x
- *
- * TODO: this only scales to 256 but need to support result up to 1024
- * Using Newton-Raphson method
- * Assuming x is in Q8.8 format
- */
-inline uint16_t approx_inv(uint16_t x)
+inline double fixed_to_double(unsigned int x, unsigned int frac)
 {
-    uint16_t xx = x;
-
-    // First, scale the input to be within [0.5, 1.0]
-    int8_t scale = (xx > 0xff) << 3;
-    xx >>= scale;
-
-    uint16_t shift = (xx > 0xf ) << 2;
-    xx >>= shift;
-    scale |= shift;
-
-    shift = (xx > 0x3 ) << 1;
-    xx >>= shift;
-    scale |= shift;
-
-    scale |= (xx >> 1);
-    scale = 7 - scale;
-
-    const uint16_t shl = (scale < 0) ?      0 : scale;
-    const uint16_t shr = (scale < 0) ? -scale :     0;
-    const uint16_t x_sc = rshift_round(x << shl, shr);
-
-    // printf("x_orig: %d, scale: %d, x_sc: %d, x_sc_bin: ", x, scale, x_sc);
-    // print_bin(x_sc, 8);
-    // printf("\n");
-
-    // Then, compute the initial estimate
-    constexpr uint16_t A = 0x01e2;  // 32.0 / 17.0  Q8.8
-    constexpr uint16_t B = 0x02d3;  // 48.0 / 17.0  Q8.8
-    const uint16_t init = B - rshift_round(A * x_sc, 8);
-    // printf("A: %d, B: %d  \n", A, B);
-    // printf("init: %d  ", init);
-    // print_bin(init, 16);
-    // printf("\n");
-
-    // Newthon-Raphson iterations
-    uint32_t y0 = init;
-    uint32_t y1 = init;
-    y1 = (y0 << 1) - rshift_round(x_sc * y0 * y0, 16);  // 1st
-    y0 = y1;
-    y1 = (y0 << 1) - rshift_round(x_sc * y0 * y0, 16);  // 2nd
-
-    // The result is scaled down now, we need to scale it back
-    return rshift_round(y1 << shl, shr);
+    return (double)(x) / ( (double)(1 << frac) );
 }
 
- /* Assuming x is in Q2.16 format */
+#endif // NDEBUG
+
+ /* Approximate 1/x in fixed point arithmetic.
+  *
+  * Assumes x is in Q2.16 format (unsigned). Returns Q10.22.
+  */
 inline uint32_t approx_inv32(uint32_t x)
 {
     uint32_t xx = x;
 
     // First, scale the input to be within [0.5, 1.0]
-    int32_t scale = (xx > 0xff) << 3;
+    int32_t scale = (xx > 0xffff) << 4;
     xx >>= scale;
 
-    uint32_t shift = (xx > 0xf ) << 2;
+    uint32_t shift = (xx > 0xff) << 3;
+    xx >>= shift;
+    scale |= shift;
+
+    shift = (xx > 0xf ) << 2;
     xx >>= shift;
     scale |= shift;
 
@@ -595,47 +553,44 @@ inline uint32_t approx_inv32(uint32_t x)
     scale |= shift;
 
     scale |= (xx >> 1);  // now, scale is log2(x)
-    scale = 7 - scale;
+    scale = 15 - scale;
+    printf("  %2d", scale);
 
     const uint32_t shl = (scale < 0) ?      0 : scale;
     const uint32_t shr = (scale < 0) ? -scale :     0;
-    const uint32_t x_sc = rshift_round(x << shl, shr+1); // x_sc in 0.5--1.0, so Q0.16 -> Q0.15
-
-    // printf("x_orig: %d, scale: %d, x_sc: %d, x_sc_bin: ", x, scale, x_sc);
-    // print_bin(x_sc, 8);
-    // printf("\n");
+    const uint32_t x_sc = (x << shl) >> (shr+1); // x_sc is 0.5--1.0, so Q0.16 -> Q0.15
 
     // Then, compute the initial estimate
-    constexpr uint32_t A = 0xF0F1; // 32.0 / 17.0  Q2.15
+    constexpr uint32_t A = 0x0000F0F1; // 32.0 / 17.0  Q2.15
     constexpr uint32_t B = 0xB4B4B4B5; // 48.0 / 17.0  Q2.30
-    // constexpr uint32_t B = rshift_round(0x2d2d3, 1); // 48.0 / 17.0  Q2.16 -> Q2.15
-    const uint32_t A_x_sc = A * x_sc; // Q4.30 but x_sc is <= 1 so the two MSB are unused => Q2.30
+
+    const uint32_t A_x_sc = A * x_sc;  // Q4.30 but x_sc is <= 1 so the two MSB are unused => Q2.30
     const uint32_t init = B - A_x_sc;  // Q2.30 - Q2.30 = Q3.30 -> Q2.30 (won't overflow)
-    // printf("A: %d, B: %d  \n", A, B);
-    // printf("init: %d  ", init);
-    // print_bin(init, 16);
-    // printf("\n");
+
+    constexpr uint32_t ONE = (1 << 15) - 1;  // 1 in Q0.15
 
     // Newthon-Raphson iterations
     // 1st
-    uint32_t y0 = rshift_round(init, 15);       // Q2.15
-    uint32_t y00 = rshift_round(init, 1);       // Q2.29
-    uint32_t tmp = rshift_round(x_sc * y0, 15); // Q0.15 * Q2.15 = Q2.30 -> Q2.15
-    tmp = rshift_round(tmp * y0, 15);           // Q2.15 * Q2.15 = Q4.30 but the value never goes >2 => Q2.30
-    uint32_t y1 = (y00 << 1) - tmp;             // Q2.29 << 1 - Q2.30 = Q3.30 but won't increase => Q2.30
-    // 2nd
-    y0 = rshift_round(y1, 15);                  // Q2.15
-    y00 = rshift_round(y1, 1);                  // Q2.29
-    tmp = rshift_round(x_sc * y0, 15);          // Q0.15 * Q2.15 = Q2.30 -> Q2.15
-    tmp = rshift_round(tmp * y0, 15);           // Q2.15 * Q2.15 = Q4.30 but the value never goes >2 => Q2.30
-    y1 = (y00 << 1) - tmp;                      // Q2.29 << 1 - Q2.30 = Q3.30 but won't increase => Q2.30
+    uint32_t y0 = init >> 15;             // Q2.15
+    uint32_t y00 = init;                  // Q2.30
+    uint32_t tmp = (x_sc * y0) >> 15;     // Q0.15 * Q2.15 = Q2.30 -> Q2.15
+    uint32_t y1 = y00 + y0 * (ONE - tmp); // Q2.30 + (Q2.15 * (Q0.15 - Q2.15))
 
-    // y1 = (y0 << 1) - rshift_round(x_sc * y0 * y0, 16);  // 2nd
+    // 2nd
+    y0 = y1 >> 15;
+    y00 = y1;
+    tmp = (x_sc * y0) >> 15;
+    y1 = y00 + y0 * (ONE - tmp);
+
+    // 3rd
+    y0 = y1 >> 15;
+    y00 = y1;// >> 1;
+    tmp = (x_sc * y0) >> 15;
+    y1 = y00 + y0 * (ONE - tmp);
 
     // The result is scaled down now, we need to scale it back
-    // TODO: must hold value up to 1024
-    // TODO: do not output 1024 but 1023.999999... to save one bit
-    return rshift_round(y1 << shl, shr);
+    y1 >>= 8; // Q10.22
+    return (y1 << shl) >> shr;
 }
 
 }  // namespace simple
