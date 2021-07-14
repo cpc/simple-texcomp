@@ -882,6 +882,9 @@ void encode_block_int(
             (decimal)(mincol.z) / F(256.0),
         };
 
+        uint32_t one = (1 << (8 - q_int)) - 1;
+        print_fixed("one:", one, q_frac);
+
         uint8_t ideal_weights[MAX_PIXEL_COUNT];
         decimal sqerr = F(0.0);
         for (int i = 0; i < pixel_count; ++i)
@@ -899,15 +902,12 @@ void encode_block_int(
             // to inset / quantization but the pixels didn't
             // Vec3u8 diff = satsub(block_u8[i], mincol);
             Vec3u8 diff = block_u8[i] - mincol;
-            // uint16_t res_hi = diff.dot(ep_sc8_hi) << 5;
-            // uint16_t res_lo = diff.dot(ep_sc8_lo);
-            // ideal_weights[i] = (uint8_t)(res_hi + res_lo);
 
-            // dot product max: Q5.3 * Q0.8 + 2xADD = Q7.11 -> sat 5.11 (0.11)
-            // dot product min: Q0.8 * Q0.8 + 2xADD = Q2.16 -> sat 0.16
-            uint16_t res = diff.satdot(ep_sc8);
+            // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
+            // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
+            // recover lost precision by adding one
+            uint16_t res = diff.sataccdot(ep_sc8, one);
             ideal_weights[i] = (uint8_t)(res >> (8 - q_int));  // -> Q0.8
-            ideal_weights[i] += 1; // restore precision that got lost somehow
 
             printf("%3d:", i);
             print_fixed8("   diff.x", diff.x, 8);

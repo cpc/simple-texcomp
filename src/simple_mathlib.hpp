@@ -237,22 +237,21 @@ struct Vec3u8
         return (uint16_t)((xx + yy + zz) >> 2);  // round off the two additions
     }
 
-    inline uint16_t satdot(const Vec3u8 &other) const
+    inline uint16_t sataccdot(const Vec3u8 &other, uint32_t acc) const
     {
         // Saturating dot product (overflow clamps to 0xffff)
-        uint32_t xx = x * other.x;
-        uint32_t yy = y * other.y;
-        uint32_t zz = z * other.z;
+        uint32_t xx = (uint32_t)x * (uint32_t)other.x;
+        uint32_t yy = (uint32_t)y * (uint32_t)other.y;
+        uint32_t zz = (uint32_t)z * (uint32_t)other.z;
 
-        uint32_t res32 = xx + yy + zz;
-        uint16_t res16 = (uint16_t)(res32);
+        uint32_t res32 = acc + xx + yy + zz;
 
-        if (res32 != (uint32_t)(res16))
+        if (res32 > 0xffff)
         {
             return 0xffff;
         }
 
-        return res16;
+        return (uint16_t)(res32);
     }
 
     inline uint32_t dot32(const Vec3u8 &other) const
