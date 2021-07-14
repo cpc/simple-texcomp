@@ -169,6 +169,13 @@ struct Vec3i
     }
 };
 
+struct Vec3u32
+{
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+};
+
 struct Vec3u8
 {
     uint8_t x;
@@ -228,6 +235,24 @@ struct Vec3u8
 
         // max. possible value is 255*255*3 = 0b10.1111101000000011 (Q18.16)
         return (uint16_t)((xx + yy + zz) >> 2);  // round off the two additions
+    }
+
+    inline uint16_t satdot(const Vec3u8 &other) const
+    {
+        // Saturating dot product (overflow clamps to 0xffff)
+        uint32_t xx = x * other.x;
+        uint32_t yy = y * other.y;
+        uint32_t zz = z * other.z;
+
+        uint32_t res32 = xx + yy + zz;
+        uint16_t res16 = (uint16_t)(res32);
+
+        if (res32 != (uint32_t)(res16))
+        {
+            return 0xffff;
+        }
+
+        return res16;
     }
 
     inline uint32_t dot32(const Vec3u8 &other) const
@@ -529,9 +554,19 @@ inline double fixed_to_double(unsigned int x, unsigned int frac)
 inline void print_fixed(const char *pre, unsigned int x, unsigned int frac)
 {
     int l = strlen(pre);
-    printf("%*s %8u  ", l, pre, x);
+    printf("%*s %10u  ", l, pre, x);
     print_bin_(x, 32, frac);
     printf("  %13.8f\n", fixed_to_double(x, frac));
+}
+
+inline void print_fixed8(const char *pre, unsigned int x, unsigned int frac)
+{
+    int l = strlen(pre);
+    double xfi = fixed_to_double(x, frac);
+
+    printf("%*s %3u  ", l, pre, x);
+    print_bin_(x, 8, frac);
+    printf("  %12.8f", xfi);
 }
 
 #endif // NDEBUG
@@ -598,6 +633,29 @@ inline uint32_t approx_inv32(uint32_t x)
     // The result is scaled down now, we need to scale it back
     y1 >>= 8; // Q10.22
     return (y1 << shl) >> shr;
+}
+
+/* Compute log2 (i.e., the position of the highest bit set) */
+inline uint32_t log2(uint32_t x)
+{
+    uint32_t scale = (x > 0xffff) << 4;
+    x >>= scale;
+
+    uint32_t shift = (x > 0xff) << 3;
+    x >>= shift;
+    scale |= shift;
+
+    shift = (x > 0xf ) << 2;
+    x >>= shift;
+    scale |= shift;
+
+    shift = (x > 0x3 ) << 1;
+    x >>= shift;
+    scale |= shift;
+
+    scale |= (x >> 1);
+
+    return scale;
 }
 
 }  // namespace simple

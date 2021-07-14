@@ -415,9 +415,9 @@ void encode_block(
         #pragma clang loop interleave_count(2)
 #endif  // ANDROID
         for (int i = 0; i < pixel_count; ++i) {
-            block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(256.0);
-            block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(256.0);
-            block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(256.0);
+            block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(255.0);
+            block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(255.0);
+            block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(255.0);
 
             tmp_min[0] = fmin(tmp_min[0], block_flt[i].x);
             tmp_min[1] = fmin(tmp_min[1], block_flt[i].y);
@@ -807,7 +807,8 @@ void encode_block_int(
         // printf("   ep_dot8: %3d \n", ep_dot);
 
         // uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec), Q8.8
-        uint32_t inv_ep_dot = approx_inv32(ep_dot);   // Q10.22
+        // Q10.22, max. value 1024 for 5b quant
+        uint32_t inv_ep_dot = approx_inv32(ep_dot);
         print_fixed("inv_ep_dot:", inv_ep_dot, 22);
         // print_bin_(ep_dot, 32, 22);
         // printf("  %13.8f\n", fixed_to_double(inv_ep_dot, 22));
@@ -832,60 +833,68 @@ void encode_block_int(
         // };
         // printf("     ep_sc: %3d %3d %3d\n", ep_vec_scaled.x, ep_vec_scaled.y, ep_vec_scaled.z);
 
-        // this can be max. 32
-        // TODO: do not use 32 but next lowest value to save one bit (similar to 1024 earlier)
-        uint32_t ep_sc32_x = ep_vec.x * (inv_ep_dot >> 8);  // Q0.8 * Q10.14 = Q10.22
-        uint32_t ep_sc32_y = ep_vec.y * (inv_ep_dot >> 8);
-        uint32_t ep_sc32_z = ep_vec.z * (inv_ep_dot >> 8);
-
-        decimal ep_sc32_x_f = ep_vec_f.x * inv_ep_dot_f;
-        decimal ep_sc32_y_f = ep_vec_f.y * inv_ep_dot_f;
-        decimal ep_sc32_z_f = ep_vec_f.z * inv_ep_dot_f;
-
-        uint8_t ep_sc8_x = (uint8_t)(ep_sc32_x >> 19);
-        uint8_t ep_sc8_y = (uint8_t)(ep_sc32_y >> 19);
-        uint8_t ep_sc8_z = (uint8_t)(ep_sc32_z >> 19);
-
-        printf("ep_sc32:\n");
-        printf("x, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
-            (double)ep_sc32_x_f, fixed_to_double(ep_sc32_x, 22), fixed_to_double(ep_sc8_x, 3));
-        printf("y, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
-            (double)ep_sc32_y_f, fixed_to_double(ep_sc32_y, 22), fixed_to_double(ep_sc8_y, 3));
-        printf("z, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
-            (double)ep_sc32_z_f, fixed_to_double(ep_sc32_z, 22), fixed_to_double(ep_sc8_z, 3));
-
-
-        // the numbers are within the range of 1/3 .. 32 which is exactly 8 bits
-        // this requires Q5.3 precision (to store the 31.99999)
-        // then, shift right to get Q0.8 (max. value 0.999999 instead of 31.999)
-        // Vec3u8 ep_vec_scaled8 = {
-        //     (uint8_t)(rshift_round(ep_sc32_x, 14+5)),
-        //     (uint8_t)(rshift_round(ep_sc32_y, 14+5)),
-        //     (uint8_t)(rshift_round(ep_sc32_z, 14+5)),
-        // };
-        // TODO: fix the above
-        // the following are Q5.3 but treated as Q0.8 (same as inp. pixels), need to be scaled later:
-        Vec3u8 ep_vec_scaled8 = {
-            (uint8_t)(31 << 3),
-            (uint8_t)(rshift_round(0b01010101, 5)),  // 1/3
-            (uint8_t)(0b11111111111111111 >> 5),     // 32-1/8
+        // The scaled ep_vec can be max. 32 due to 5b quantization
+        Vec3u32 ep_sc32 = {
+            ep_vec.x * (inv_ep_dot >> 8),  // Q0.8 * Q10.14 = Q10.22
+            ep_vec.y * (inv_ep_dot >> 8),
+            ep_vec.z * (inv_ep_dot >> 8),
         };
-        printf("    ep_sc8: %3d %3d %3d\n", ep_vec_scaled8.x, ep_vec_scaled8.y, ep_vec_scaled8.z);
-        print_bin_(ep_vec_scaled8.x, 8, 3); printf("\n");
-        print_bin_(ep_vec_scaled8.y, 8, 3); printf("\n");
-        print_bin_(ep_vec_scaled8.z, 8, 3); printf("\n");
 
-        // Vec3u8 ep_sc8_hi = {
-        //     // integer part
-        // };
+        Vec3f ep_sc32_f = ep_vec_f * inv_ep_dot_f;
 
-        // Vec3u8 ep_sc8_lo = {
-        //     // decimal part
-        // };
+        Vec3u8 log2ep = {
+            (uint8_t)(log2(ep_sc32.x)),
+            (uint8_t)(log2(ep_sc32.y)),
+            (uint8_t)(log2(ep_sc32.z)),
+        };
+
+        uint8_t sc = u8max(u8max(log2ep.x, log2ep.y), log2ep.z); // highest bit set
+        uint8_t q_int = sc >= 21 ? sc - 21 : 0;       // no. integer bits
+        uint8_t q_frac = q_int <= 8 ? 8 - q_int : 8;  // no. fractional bits
+        uint8_t shr = 14 + q_int;                     // how much to shift right
+        printf("largest bit set of ep_sc32: %d,  shift right by %d\n", sc, shr);
+
+        Vec3u8 ep_sc8 = {
+            (uint8_t)(ep_sc32.x >> shr),
+            (uint8_t)(ep_sc32.y >> shr),
+            (uint8_t)(ep_sc32.z >> shr),
+        };
+
+        printf("ep_sc:\n");
+        printf("x, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.x, fixed_to_double(ep_sc32.x, 22));
+        print_bin_(ep_sc32.x, 32, 22);
+        printf("  Q%d.%d: %11.8f\n", q_int, q_frac, fixed_to_double(ep_sc8.x, q_frac));
+        printf("y, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.y, fixed_to_double(ep_sc32.y, 22));
+        print_bin_(ep_sc32.y, 32, 22);
+        printf("  Q%d.%d: %11.8f\n", q_int, q_frac, fixed_to_double(ep_sc8.y, q_frac));
+        printf("z, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.z, fixed_to_double(ep_sc32.z, 22));
+        print_bin_(ep_sc32.z, 32, 22);
+        printf("  Q%d.%d: %11.8f\n", q_int, q_frac, fixed_to_double(ep_sc8.z, q_frac));
+
+        // printf("y, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
+        //     (double)ep_sc32_f.y, fixed_to_double(ep_sc32.y, 22), fixed_to_double(ep_sc8.y, 3));
+        // printf("z, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
+        //     (double)ep_sc32_f.z, fixed_to_double(ep_sc32.z, 22), fixed_to_double(ep_sc8.z, 3));
+
+        Vec3f mincol_f = {
+            (decimal)(mincol.x) / F(256.0),
+            (decimal)(mincol.y) / F(256.0),
+            (decimal)(mincol.z) / F(256.0),
+        };
 
         uint8_t ideal_weights[MAX_PIXEL_COUNT];
+        decimal sqerr = F(0.0);
         for (int i = 0; i < pixel_count; ++i)
         {
+            Vec3f px_f = {
+                (decimal)(block_pixels[NCH_RGB * i]) / F(256.0),
+                (decimal)(block_pixels[NCH_RGB * i + 1]) / F(256.0),
+                (decimal)(block_pixels[NCH_RGB * i + 2]) / F(256.0),
+            };
+
+            Vec3f diff_f = px_f - mincol_f;
+            decimal res_f = diff_f.dot(ep_sc32_f);
+
             // clamp is necessary because the min/max values shrank inwards due
             // to inset / quantization but the pixels didn't
             // Vec3u8 diff = satsub(block_u8[i], mincol);
@@ -894,12 +903,24 @@ void encode_block_int(
             // uint16_t res_lo = diff.dot(ep_sc8_lo);
             // ideal_weights[i] = (uint8_t)(res_hi + res_lo);
 
-            // dot product: Q5.3 * Q0.8 + 3xADD = Q8.11, truncated to 5.11, should be within 0.11
-            uint16_t res = diff.dot(ep_vec_scaled8);
-            ideal_weights[i] = (uint8_t)(res >> 3);
+            // dot product max: Q5.3 * Q0.8 + 2xADD = Q7.11 -> sat 5.11 (0.11)
+            // dot product min: Q0.8 * Q0.8 + 2xADD = Q2.16 -> sat 0.16
+            uint16_t res = diff.satdot(ep_sc8);
+            ideal_weights[i] = (uint8_t)(res >> (8 - q_int));  // -> Q0.8
+            ideal_weights[i] += 1; // restore precision that got lost somehow
 
-            // TODO: saturate
+            printf("%3d:", i);
+            print_fixed8("   diff.x", diff.x, 8);
+            print_fixed8("  |  diff.y", diff.y, 8);
+            print_fixed8("  |  diff.z", diff.z, 8);
+            print_fixed8("  |  res", ideal_weights[i], 8);
+            double res_fi = fixed_to_double(ideal_weights[i], 8);
+            printf("  %+13.8f", res_fi - (double)(res_f));
+            printf("\n");
+
+            sqerr += ((decimal)res_fi - res_f) * ((decimal)res_fi - res_f);
         }
+        printf("sqerr: %f\n", (double)sqerr);
     }
 }
 

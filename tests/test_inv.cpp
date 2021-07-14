@@ -8,25 +8,9 @@ using namespace simple;
 /* Same as mathlib version but with debug prints */
 uint32_t approx_inv32_debug(uint32_t x)
 {
-    uint32_t xx = x;
 
     // First, scale the input to be within [0.5, 1.0]
-    int32_t scale = (xx > 0xffff) << 4;
-    xx >>= scale;
-
-    uint32_t shift = (xx > 0xff) << 3;
-    xx >>= shift;
-    scale |= shift;
-
-    shift = (xx > 0xf ) << 2;
-    xx >>= shift;
-    scale |= shift;
-
-    shift = (xx > 0x3 ) << 1;
-    xx >>= shift;
-    scale |= shift;
-
-    scale |= (xx >> 1);  // now, scale is log2(x)
+    int scale = (int)(log2(x));
     scale = 15 - scale;
     printf("  %2d", scale);
 
