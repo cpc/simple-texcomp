@@ -526,6 +526,14 @@ inline double fixed_to_double(unsigned int x, unsigned int frac)
     return (double)(x) / ( (double)(1 << frac) );
 }
 
+inline void print_fixed(const char *pre, unsigned int x, unsigned int frac)
+{
+    int l = strlen(pre);
+    printf("%*s %8u  ", l, pre, x);
+    print_bin_(x, 32, frac);
+    printf("  %13.8f\n", fixed_to_double(x, frac));
+}
+
 #endif // NDEBUG
 
  /* Approximate 1/x in fixed point arithmetic.
@@ -554,7 +562,6 @@ inline uint32_t approx_inv32(uint32_t x)
 
     scale |= (xx >> 1);  // now, scale is log2(x)
     scale = 15 - scale;
-    printf("  %2d", scale);
 
     const uint32_t shl = (scale < 0) ?      0 : scale;
     const uint32_t shr = (scale < 0) ? -scale :     0;

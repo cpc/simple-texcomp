@@ -361,9 +361,9 @@ Vec3i quantize_5b(Vec3f *vec)
 Vec3u8 quantize_5b_u8(Vec3u8 *vec)
 {
     // TODO: rounding
-    uint8_t quant_x = rshift_round(vec->x, 3);
-    uint8_t quant_y = rshift_round(vec->y, 3);
-    uint8_t quant_z = rshift_round(vec->z, 3);
+    uint8_t quant_x = vec->x >> 3;
+    uint8_t quant_y = vec->y >> 3;
+    uint8_t quant_z = vec->z >> 3;
 
     uint8_t dequant_x = (quant_x << 3) | (quant_x >> 2);
     uint8_t dequant_y = (quant_y << 3) | (quant_y >> 2);
@@ -411,8 +411,6 @@ void encode_block(
     {
         ZoneScopedN("minmax");
 #ifdef ANDROID
-//        #pragma clang loop interleave(disable)
-//        #pragma clang loop unroll(disable)
         #pragma clang loop vectorize_width(4, scalable)
         #pragma clang loop interleave_count(2)
 #endif  // ANDROID
@@ -738,8 +736,6 @@ void encode_block_int(
     {
         ZoneScopedN("minmax");
 #ifdef ANDROID
-//        #pragma clang loop interleave(disable)
-//        #pragma clang loop unroll(disable)
         #pragma clang loop vectorize_width(4, scalable)
         #pragma clang loop interleave_count(2)
 #endif  // ANDROID
@@ -766,7 +762,7 @@ void encode_block_int(
     // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/255th, too small
     // mincol = satadd(mincol, inset);
     // maxcol = satsub(maxcol, inset);
-    print_minmax("ins", mincol, maxcol);
+    // print_minmax("ins", mincol, maxcol);
 
     // Quantize endpoints
     Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
@@ -791,48 +787,73 @@ void encode_block_int(
         Vec3u8 ep_vec = maxcol - mincol;
         printf("        ep: %3d %3d %3d\n", ep_vec.x, ep_vec.y, ep_vec.z);
 
+        Vec3f ep_vec_f = {
+            (decimal)(ep_vec.x) / F(256.0),
+            (decimal)(ep_vec.y) / F(256.0),
+            (decimal)(ep_vec.z) / F(256.0),
+        };
+
         // Projection of pixels onto ep_vec to get the ideal weights
+        // uint16_t ep_dot = ep_vec.dot16(ep_vec);     // Q2.14
+        uint32_t ep_dot = ep_vec.dot32(ep_vec);     // Q2.16
+        print_fixed("    ep_dot:", ep_dot, 16);
+        // printf("  ep_dot16: %8d  ", ep_dot);
+        // print_bin_(ep_dot, 32, 16);
+        // printf("  %13.8f\n", fixed_to_double(ep_dot, 16));
 
-        uint16_t ep_dot = ep_vec.dot16(ep_vec);     // Q2.14
-        // uint32_t ep_dot = ep_vec.dot32(ep_vec);     // Q2.16
-        printf("  ep_dot16: %3d \n", ep_dot);
+        decimal ep_dot_f = ep_vec_f.dot(ep_vec_f);
 
-        ep_dot = rshift_round(ep_dot, 6); // Q8.8 with rounding
-        printf("   ep_dot8: %3d \n", ep_dot);
+        // ep_dot = rshift_round(ep_dot, 6); // Q8.8 with rounding
+        // printf("   ep_dot8: %3d \n", ep_dot);
 
         // uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec), Q8.8
-        uint32_t inv_ep_dot = approx_inv32(ep_dot);   // 1 / ep_vec.dot(ep_vec),
-        printf("inv_ep_dot: %d\n", inv_ep_dot);
-        print_bin_(inv_ep_dot, 32, 8);
-        printf("\n");
+        uint32_t inv_ep_dot = approx_inv32(ep_dot);   // Q10.22
+        print_fixed("inv_ep_dot:", inv_ep_dot, 22);
+        // print_bin_(ep_dot, 32, 22);
+        // printf("  %13.8f\n", fixed_to_double(inv_ep_dot, 22));
+        // print_bin_(inv_ep_dot, 32, 8);
+        // printf("\n");
 
-        // TODO: finish approx_inv32() and remove this clutch
-        uint32_t inv_ep_dot32 = inv_ep_dot << 22; // Q10.22 (TODO: 1024 overflows, needs round)
-        printf("inv_dp_32: %d\n", inv_ep_dot32);
-        print_bin_(inv_ep_dot32, 32, 22);
-        printf("\n");
+        decimal inv_ep_dot_f = F(1.0) / ep_dot_f;
 
-        uint32_t ep_vec32_x = ep_vec.x << 14; // Q8.8 -> Q0.22
-        uint32_t ep_vec32_y = ep_vec.y << 14;
-        uint32_t ep_vec32_z = ep_vec.z << 14;
-        printf("ep.x:\n");
-        print_bin_(ep_vec.x, 32, 8);
-        printf("\n");
-        print_bin_(ep_vec32_x, 32, 22);
-        printf("\n");
+        // uint32_t ep_vec32_x = ep_vec.x << 14; // Q0.8 -> Q0.22
+        // uint32_t ep_vec32_y = ep_vec.y << 14;
+        // uint32_t ep_vec32_z = ep_vec.z << 14;
+        // printf("ep.x:\n");
+        // print_bin_(ep_vec.x, 32, 8);
+        // printf("\n");
+        // print_bin_(ep_vec32_x, 32, 22);
+        // printf("\n");
 
-        Vec3u16 ep_vec_scaled = {
-            (uint16_t)(rshift_round(ep_vec.x * inv_ep_dot, 8)),
-            (uint16_t)(rshift_round(ep_vec.y * inv_ep_dot, 8)),
-            (uint16_t)(rshift_round(ep_vec.z * inv_ep_dot, 8)),
-        };
-        printf("     ep_sc: %3d %3d %3d\n", ep_vec_scaled.x, ep_vec_scaled.y, ep_vec_scaled.z);
+        // Vec3u16 ep_vec_scaled = {
+        //     (uint16_t)(rshift_round(ep_vec.x * inv_ep_dot, 8)),
+        //     (uint16_t)(rshift_round(ep_vec.y * inv_ep_dot, 8)),
+        //     (uint16_t)(rshift_round(ep_vec.z * inv_ep_dot, 8)),
+        // };
+        // printf("     ep_sc: %3d %3d %3d\n", ep_vec_scaled.x, ep_vec_scaled.y, ep_vec_scaled.z);
 
         // this can be max. 32
         // TODO: do not use 32 but next lowest value to save one bit (similar to 1024 earlier)
-        uint32_t ep_sc32_x = (ep_vec32_x >> 11) * (inv_ep_dot32 >> 11);  // Q0.11 * Q10.11 = Q10.22
-        uint32_t ep_sc32_y = (ep_vec32_y >> 11) * (inv_ep_dot32 >> 11);
-        uint32_t ep_sc32_z = (ep_vec32_z >> 11) * (inv_ep_dot32 >> 11);
+        uint32_t ep_sc32_x = ep_vec.x * (inv_ep_dot >> 8);  // Q0.8 * Q10.14 = Q10.22
+        uint32_t ep_sc32_y = ep_vec.y * (inv_ep_dot >> 8);
+        uint32_t ep_sc32_z = ep_vec.z * (inv_ep_dot >> 8);
+
+        decimal ep_sc32_x_f = ep_vec_f.x * inv_ep_dot_f;
+        decimal ep_sc32_y_f = ep_vec_f.y * inv_ep_dot_f;
+        decimal ep_sc32_z_f = ep_vec_f.z * inv_ep_dot_f;
+
+        uint8_t ep_sc8_x = (uint8_t)(ep_sc32_x >> 19);
+        uint8_t ep_sc8_y = (uint8_t)(ep_sc32_y >> 19);
+        uint8_t ep_sc8_z = (uint8_t)(ep_sc32_z >> 19);
+
+        printf("ep_sc32:\n");
+        printf("x, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
+            (double)ep_sc32_x_f, fixed_to_double(ep_sc32_x, 22), fixed_to_double(ep_sc8_x, 3));
+        printf("y, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
+            (double)ep_sc32_y_f, fixed_to_double(ep_sc32_y, 22), fixed_to_double(ep_sc8_y, 3));
+        printf("z, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
+            (double)ep_sc32_z_f, fixed_to_double(ep_sc32_z, 22), fixed_to_double(ep_sc8_z, 3));
+
 
         // the numbers are within the range of 1/3 .. 32 which is exactly 8 bits
         // this requires Q5.3 precision (to store the 31.99999)
