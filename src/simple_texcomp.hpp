@@ -198,6 +198,12 @@ namespace bilin {
         decimal *__restrict__ out         // output values
     );
 
+    /** Same as downsample but with fixed inp/out size */
+    void downsample_12x12_to_8x5_u8(
+        const uint8_t *__restrict__ inp,  // input values
+        uint8_t *__restrict__ out         // output values
+    );
+
 }
 
 } // namespace simple

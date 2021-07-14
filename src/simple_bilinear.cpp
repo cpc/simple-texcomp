@@ -209,6 +209,25 @@ static constexpr decimal BILIN_WEIGHTS_Y_5[6*5] = {
     F(0.14286), F(0.33333), F(0.52381), F(0.00000), F(0.00000), F(0.00000),
 };
 
+static constexpr uint8_t BILIN_WEIGHTS_X_8_U8[3*8] = {
+    187,  68,   0,
+    111, 128,  16,
+     42, 142,  71,
+     90, 135,  30,
+     30, 135,  90,
+     71, 142,  42,
+     16, 128, 111,
+     68, 187,   0,
+};
+
+static constexpr uint8_t BILIN_WEIGHTS_Y_5_U8[6*5] = {
+    134,  85,  36,   0,   0,   0,
+     34,  68,  85,  51,  17,   0,
+      8,  42,  77,  77,  42,   8,  // bumped two middle values to sum up to 254
+     17,  51,  85,  68,  34,   0,
+     36,  85, 134,   0,   0,   0,
+};
+
 /** Test if two floating point numbers are almost equal */
 static inline bool is_close_enough(decimal a, decimal b)
 {
@@ -527,6 +546,64 @@ void downsample_12x12_to_8x5(
                 const decimal inp_pixel = tmp[idx*w_out+m];
                 const decimal weight = BILIN_WEIGHTS_Y_5[n*pixel_count_y+y];
                 out_pixel += inp_pixel * weight;
+            }
+            out[n*w_out+m] = out_pixel;
+        }
+    }
+    }
+}
+
+/** See top header for description */
+void downsample_12x12_to_8x5_u8(
+    const uint8_t *__restrict__ inp,
+    uint8_t *__restrict__ out
+){
+    ZoneScopedN("bilin");
+
+    constexpr int w_inp = 12;
+    constexpr int h_inp = 12;
+    constexpr int w_out = 8;
+    constexpr int h_out = 5;
+
+    // size of the bilin. kernel
+    constexpr uint8_t pixel_count_x = 3;
+    constexpr uint8_t pixel_count_y = 6;
+
+    // Buffer for holding intermediate results
+    uint8_t tmp[astc::MAX_BLOCK_DIM*astc::MAX_GRID_DIM];
+
+    // First, interpolate rows.
+    { ZoneScopedN("rows");
+    for (int y = 0; y < h_inp; ++y)
+    {
+        for (int m = 0; m < w_out; ++m)
+        {
+            uint8_t out_pixel = 0;
+            for (uint8_t x = 0; x < pixel_count_x; ++x)
+            {
+                const uint8_t idx = BILIN_IDX_X_8[m][x];
+                const uint8_t inp_pixel = inp[y*w_inp+idx];
+                const uint8_t weight = BILIN_WEIGHTS_X_8_U8[m*pixel_count_x+x];
+                out_pixel += (uint8_t)( ( (uint16_t)inp_pixel * (uint16_t)weight ) >> 8 );
+            }
+            tmp[y*w_out+m] = out_pixel;
+        }
+    }
+    }
+
+    // Next, columns
+    { ZoneScopedN("cols");
+    for (int n = 0; n < h_out; ++n)
+    {
+        for (int m = 0; m < w_out; ++m)
+        {
+            uint8_t out_pixel = 0;
+            for (uint8_t y = 0; y < pixel_count_y; ++y)
+            {
+                const uint8_t idx = BILIN_IDX_Y_5[n][y];
+                const uint8_t inp_pixel = tmp[idx*w_out+m];
+                const uint8_t weight = BILIN_WEIGHTS_Y_5_U8[n*pixel_count_y+y];
+                out_pixel += (uint8_t)( ( (uint16_t)inp_pixel * (uint16_t)weight ) >> 8 );
             }
             out[n*w_out+m] = out_pixel;
         }

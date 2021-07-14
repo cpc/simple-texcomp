@@ -79,6 +79,26 @@ static void print_bilinear_weights(const bilin::bilinear_weights* bw)
     }
     printf("};\n");
 
+    printf("\nbilin_weights_x_u8 = {\n");
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
+    {
+        printf("    {\n");
+        for (int j = 0; j < astc::MAX_BLOCK_DIM; ++j)
+        {
+            if (j % 6 == 0)
+            {
+                printf("        ");
+            }
+            printf("%3d, ", (int)(bw->bilin_weights_x[i][j] * F(256.0)));
+            if (j % 6 == 5)
+            {
+                printf("\n");
+            }
+        }
+        printf("    },\n");
+    }
+    printf("};\n");
+
     printf("\nbilin_pixel_count_y = {\n");
     for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
     {
@@ -109,6 +129,26 @@ static void print_bilinear_weights(const bilin::bilinear_weights* bw)
                 printf("        ");
             }
             printf("%7.5f, ", (double)bw->bilin_weights_y[i][j]);
+            if (j % 6 == 5)
+            {
+                printf("\n");
+            }
+        }
+        printf("    },\n");
+    }
+    printf("};\n");
+
+    printf("\nbilin_weights_y_u8 = {\n");
+    for (int i = 0; i < astc::MAX_GRID_DIM; ++i)
+    {
+        printf("    {\n");
+        for (int j = 0; j < astc::MAX_BLOCK_DIM; ++j)
+        {
+            if (j % 6 == 0)
+            {
+                printf("        ");
+            }
+            printf("%3d, ", (int)(bw->bilin_weights_y[i][j] * F(256.0)));
             if (j % 6 == 5)
             {
                 printf("\n");
@@ -199,14 +239,43 @@ int main(int argc, char **argv)
     // Print out the data structures
     print_bilinear_weights(&bw);
 
-    // Downsample
-    std::vector<decimal> inp_pixels_flt(inp_w*inp_h*nch);
-    for (int i = 0; i < inp_h*inp_w*nch; ++i)
+    // Downsample (assume grayscale input)
+    if ((nch != 1) && (nch != 3))
     {
-        inp_pixels_flt.at(i) = (decimal)(inp_pixels[i]) / F(255.0);
+        err_exit("Unsupported number of channels");
+    }
+    if (nch == 3)
+    {
+        printf("WARNING! Image seems not to be grayscale, sampling ITU BT.709 luminance\n");
     }
 
-    std::vector<decimal> out_pixels_flt(M*N*nch);
+    std::vector<decimal> inp_pixels_flt(inp_w*inp_h);
+    std::vector<uint8_t> inp_pixels_u8(inp_w*inp_h);
+
+    for (int i = 0; i < inp_h*inp_w; ++i)
+    {
+        decimal y = F(0.0);
+
+        if (nch == 3)
+        {
+            uint8_t r = inp_pixels[nch*i+0];
+            uint8_t g = inp_pixels[nch*i+1];
+            uint8_t b = inp_pixels[nch*i+2];
+
+            y = (decimal)(r) / F(255.0) * F(0.2126) +
+                (decimal)(g) / F(255.0) * F(0.7152) +
+                (decimal)(b) / F(255.0) * F(0.0722);
+        }
+        else
+        {
+            y = (decimal)(inp_pixels[nch*i]) / F(255.0);
+        }
+
+        inp_pixels_flt.at(i) = y;
+        inp_pixels_u8.at(i) = (uint8_t)(y * F(255.0));
+    }
+
+    std::vector<decimal> out_pixels_flt(M*N);
 
     bilin::downsample(
         inp_pixels_flt.data(),
@@ -220,7 +289,7 @@ int main(int argc, char **argv)
     printf("\nSaving result to: %s\n", out_file.c_str());
     ret = save_image(
         out_pixels_flt,
-        M, N, nch,
+        M, N, 1,
         out_file
     );
     if (ret == 0)
@@ -231,7 +300,7 @@ int main(int argc, char **argv)
     // Downsample & save fixed-sized images
     if ((inp_w == 12) && (inp_h == 12))
     {
-        std::vector<decimal> out_pixels_flt_12x12_to_8x5(8*5*nch);
+        std::vector<decimal> out_pixels_flt_12x12_to_8x5(M*N);
 
         bilin::downsample_12x12_to_8x5(
             inp_pixels_flt.data(),
@@ -241,13 +310,36 @@ int main(int argc, char **argv)
         printf("Saving result to: %s\n", out_file_12x12_to_8x5.c_str());
         ret = save_image(
             out_pixels_flt_12x12_to_8x5,
-            M, N, nch,
+            M, N, 1,
             out_file_12x12_to_8x5
         );
         if (ret == 0)
         {
             err_exit("Can't save output image");
         }
+
+        // Compute the integer variant
+        printf("\n8-bit unsigned version comparison:\n");
+        std::vector<uint8_t> out_pixels_u8_12x12_to_8x5(M*N);
+
+        bilin::downsample_12x12_to_8x5_u8(
+            inp_pixels_u8.data(),
+            out_pixels_u8_12x12_to_8x5.data()
+        );
+
+        decimal sqerr = F(0.0);
+        for (int i = 0; i < M*N; ++i)
+        {
+            decimal ref = out_pixels_flt_12x12_to_8x5.at(i);
+            decimal tgt = (decimal)(out_pixels_u8_12x12_to_8x5.at(i)) / F(255.0);
+
+            decimal diff = tgt - ref;
+            printf("%3d:  ref: %10.8f  u8: %10.8f  diff: %+11.8f\n",
+                i, (double)ref, (double)tgt, (double)diff);
+
+            sqerr += diff * diff;
+        }
+        printf("sqerr: %.8f\n", (double)sqerr);
     }
     else
     {

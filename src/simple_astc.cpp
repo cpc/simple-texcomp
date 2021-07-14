@@ -921,6 +921,12 @@ void encode_block_int(
             sqerr += ((decimal)res_fi - res_f) * ((decimal)res_fi - res_f);
         }
         printf("sqerr: %f\n", (double)sqerr);
+
+        // We downsample the weight grid before quantization
+        bilin::downsample_12x12_to_8x5_u8(
+            ideal_weights,
+            downsampled_weights
+        );
     }
 }
 
