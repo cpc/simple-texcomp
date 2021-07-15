@@ -586,7 +586,7 @@ void downsample_12x12_to_8x5_u8(
                 const uint8_t weight = BILIN_WEIGHTS_X_8_U8[m*pixel_count_x+x];
                 out_pixel += (uint8_t)( ( (uint16_t)inp_pixel * (uint16_t)weight ) >> 8 );
             }
-            tmp[y*w_out+m] = out_pixel;
+            tmp[y*w_out+m] = out_pixel + 3;  // TODO: Proper error recovery
         }
     }
     }
@@ -605,7 +605,7 @@ void downsample_12x12_to_8x5_u8(
                 const uint8_t weight = BILIN_WEIGHTS_Y_5_U8[n*pixel_count_y+y];
                 out_pixel += (uint8_t)( ( (uint16_t)inp_pixel * (uint16_t)weight ) >> 8 );
             }
-            out[n*w_out+m] = out_pixel;
+            out[n*w_out+m] = out_pixel + 2;  // TODO: Proper error recovery
         }
     }
     }
