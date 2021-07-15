@@ -772,9 +772,9 @@ void encode_block_int(
     Vec3u8 maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
 
     // inset bounding box
-    // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
-    // mincol = satadd(mincol, inset);
-    // maxcol = satsub(maxcol, inset);
+    Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
+    mincol = satadd(mincol, inset);
+    maxcol = satsub(maxcol, inset);
 
     // Quantize endpoints
     Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
@@ -832,9 +832,9 @@ void encode_block_int(
 
         for (int i = 0; i < pixel_count; ++i)
         {
-            Vec3u8 diff = block_u8[i] - mincol;
             // overflow protection (can happen with mincol rounding and inset)
-            // diff = min3u8(diff, block_u8[i]);
+            Vec3u8 px = max3u8(block_u8[i], mincol);
+            Vec3u8 diff = px - mincol;
 
             // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
             // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
@@ -966,10 +966,10 @@ void encode_block_int_debug(
     print_minmax("   ", mincol, maxcol);
 
     // inset bounding box
-    // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
-    // mincol = satadd(mincol, inset);
-    // maxcol = satsub(maxcol, inset);
-    // print_minmax("ins", mincol, maxcol);
+    Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
+    mincol = satadd(mincol, inset);
+    maxcol = satsub(maxcol, inset);
+    print_minmax("ins", mincol, maxcol);
 
     // Quantize endpoints
     Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
@@ -1104,9 +1104,9 @@ void encode_block_int_debug(
             decimal res_f = diff_f.dot(ep_sc32_f);
             ideal_weights_f[i] = res_f;
 
-            Vec3u8 diff = block_u8[i] - mincol;
             // overflow protection (can happen with mincol rounding and inset)
-            // diff = min3u8(diff, block_u8[i]);
+            Vec3u8 px = max3u8(block_u8[i], mincol);
+            Vec3u8 diff = px - mincol;
 
             // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
             // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
