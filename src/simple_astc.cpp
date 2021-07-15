@@ -979,14 +979,22 @@ void encode_block_int(
 
         // Quantize weights
         printf("\nQuantized weights\n");
+        int nerr = 0;
 
         for (int i = 0; i < wgt_count; ++i)
         {
             quantized_weights[i] = quantize_2b_u8(downsampled_weights[i]);
             quantized_weights_f[i] = quantize_2b(downsampled_weights_f[i]);
 
-            printf("%3d:  flt: %3d  u8: %3d\n", i, quantized_weights_f[i], quantized_weights[i]);
+            printf("%3d:  flt: %3d  u8: %3d", i, quantized_weights_f[i], quantized_weights[i]);
+            if (quantized_weights[i] != quantized_weights_f[i])
+            {
+                ++nerr;
+                printf("  <--");
+            }
+            printf("\n");
         }
+        printf("nerr: %d\n", nerr);
     }
 }
 
