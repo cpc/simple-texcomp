@@ -730,6 +730,7 @@ void encode_block_int(
     printf("=== BLOCK ===\n");
 
     Vec3u8 block_u8[MAX_PIXEL_COUNT];
+    Vec3f block_flt[MAX_PIXEL_COUNT];
     // using tmp values to allow vectorization
     uint8_t tmp_min[3] = { 255, 255, 255 };
     uint8_t tmp_max[3] = { 0, 0, 0 };
@@ -759,7 +760,7 @@ void encode_block_int(
     print_minmax("   ", mincol, maxcol);
 
     // inset bounding box
-    // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/255th, too small
+    // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
     // mincol = satadd(mincol, inset);
     // maxcol = satsub(maxcol, inset);
     // print_minmax("ins", mincol, maxcol);

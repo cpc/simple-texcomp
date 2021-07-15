@@ -175,7 +175,7 @@ static int save_image(
             printf("ERROR: Result pixel > 1.0: %ld, %.6f\n",
                 i, (double)out_pixel_flt);
         }
-        out_pixels.at(i) = (uint8_t)(out_pixel_flt * F(255.0));
+        out_pixels.at(i) = (uint8_t)(out_pixel_flt * F(256.0));
     }
 
     int ret = stbi_write_png(
@@ -262,17 +262,17 @@ int main(int argc, char **argv)
             uint8_t g = inp_pixels[nch*i+1];
             uint8_t b = inp_pixels[nch*i+2];
 
-            y = (decimal)(r) / F(255.0) * F(0.2126) +
-                (decimal)(g) / F(255.0) * F(0.7152) +
-                (decimal)(b) / F(255.0) * F(0.0722);
+            y = (decimal)(r) / F(256.0) * F(0.2126) +
+                (decimal)(g) / F(256.0) * F(0.7152) +
+                (decimal)(b) / F(256.0) * F(0.0722);
         }
         else
         {
-            y = (decimal)(inp_pixels[nch*i]) / F(255.0);
+            y = (decimal)(inp_pixels[nch*i]) / F(256.0);
         }
 
         inp_pixels_flt.at(i) = y;
-        inp_pixels_u8.at(i) = (uint8_t)(y * F(255.0));
+        inp_pixels_u8.at(i) = (uint8_t)(y * F(256.0));
     }
 
     std::vector<decimal> out_pixels_flt(M*N);
@@ -331,7 +331,7 @@ int main(int argc, char **argv)
         for (int i = 0; i < M*N; ++i)
         {
             decimal ref = out_pixels_flt_12x12_to_8x5.at(i);
-            decimal tgt = (decimal)(out_pixels_u8_12x12_to_8x5.at(i)) / F(255.0);
+            decimal tgt = (decimal)(out_pixels_u8_12x12_to_8x5.at(i)) / F(256.0);
 
             decimal diff = tgt - ref;
             printf("%3d:  ref: %10.8f  u8: %10.8f  diff: %+11.8f\n",
