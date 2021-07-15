@@ -996,6 +996,56 @@ void encode_block_int(
         }
         printf("nerr: %d\n", nerr);
     }
+
+    // Output buffers for quantized weights and output data
+	uint8_t wgt_buf[16];
+	uint8_t out_buf[16];
+    for (int i = 0; i < 16; ++i)
+    {
+        wgt_buf[i] = 0;
+        out_buf[i] = 0;
+    }
+
+    // weights ISE encoding
+    int off = 0;
+    for (int i = 0; i < wgt_count; ++i)
+    {
+        write_bits(quantized_weights[i], wgt_bits, off, wgt_buf);
+        off += wgt_bits;
+    }
+
+    // write out weights
+    for (int i = 0; i < 16; ++i)
+    {
+        out_buf[i] = bitrev8(wgt_buf[15-i]);
+    }
+
+    // write out mode, partition, CEM
+    write_bits(block_mode, 11, 0, out_buf);
+    const int partition_count = 1;
+    write_bits(partition_count - 1, 2, 11, out_buf);
+    const int color_format = 8;
+    write_bits(color_format, 4, 13, out_buf);
+
+    // Quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
+    uint8_t endpoints_q[6] = {
+        (uint8_t)(mincol_quant.x),
+        (uint8_t)(maxcol_quant.x),
+        (uint8_t)(mincol_quant.y),
+        (uint8_t)(maxcol_quant.y),
+        (uint8_t)(mincol_quant.z),
+        (uint8_t)(maxcol_quant.z),
+    };
+
+    // write out endpoints
+    off = 17;  // starting bit position for endpoints data
+    for (int i = 0; i < 6; ++i)
+    {
+        write_bits(endpoints_q[i], ep_bits, off, out_buf);
+        off += ep_bits;
+    }
+
+    memcpy(out, out_buf, 16);
 }
 
 } // namespace simple::astc
