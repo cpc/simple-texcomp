@@ -347,6 +347,24 @@ inline uint8_t u8max(uint8_t a, uint8_t b)
     }
 }
 
+inline Vec3u8 min3u8(Vec3u8 a, Vec3u8 b)
+{
+    return Vec3u8 {
+        u8min(a.x, b.x),
+        u8min(a.y, b.y),
+        u8min(a.z, b.z),
+    };
+}
+
+inline Vec3u8 max3u8(Vec3u8 a, Vec3u8 b)
+{
+    return Vec3u8 {
+        u8max(a.x, b.x),
+        u8max(a.y, b.y),
+        u8max(a.z, b.z),
+    };
+}
+
 inline Vec3f min3f(const Vec3f &a, const Vec3f &b)
 {
     return Vec3f {
@@ -486,7 +504,8 @@ inline Vec3u8 satsub(const Vec3u8 &inp, const Vec3u8 &other)
 template<typename T, typename U>
 inline T rshift_round(T x, U n)
 {
-    return (x >> n) + ((x >> (n - 1)) & 1);
+    x += 1 << (n-1);
+    return x >> n;
 }
 
 /* Debug prints */

@@ -326,6 +326,14 @@ uint8_t quantize_2b(decimal x)
     return quant;
 }
 
+/** Quantize 8-bit integer value into 2 bits (4 values) */
+uint8_t quantize_2b_u8(uint8_t x)
+{
+    // TODO: investigate whether the rounding is worth it
+    x = u8max(x, x + 0b00100000); // account for overflow
+    return x >> 6;
+}
+
 /** Quantize a decimal value into 5 bits (32 values)
  *
  * Returns the quantized input decimal as 8-bit integer and also modifies the
@@ -358,12 +366,20 @@ Vec3i quantize_5b(Vec3f *vec)
     return Vec3i { quant_x, quant_y, quant_z };
 }
 
+/** Quantize a 5-bit integer vector into 5 bits (32 values) */
 Vec3u8 quantize_5b_u8(Vec3u8 *vec)
 {
-    // TODO: rounding
-    uint8_t quant_x = vec->x >> 3;
-    uint8_t quant_y = vec->y >> 3;
-    uint8_t quant_z = vec->z >> 3;
+    // TODO: investigate whether the rounding is worth it
+    // uint8_t x = u8max(vec->x, vec->x + 0b00000100);
+    // uint8_t y = u8max(vec->y, vec->y + 0b00000100);
+    // uint8_t z = u8max(vec->z, vec->z + 0b00000100);
+    uint8_t x = vec->x;
+    uint8_t y = vec->y;
+    uint8_t z = vec->z;
+
+    uint8_t quant_x = x >> 3;
+    uint8_t quant_y = y >> 3;
+    uint8_t quant_z = z >> 3;
 
     uint8_t dequant_x = (quant_x << 3) | (quant_x >> 2);
     uint8_t dequant_y = (quant_y << 3) | (quant_y >> 2);
@@ -775,6 +791,7 @@ void encode_block_int(
     print_minmax("qnt", mincol, maxcol);
 
     uint8_t quantized_weights[MAX_PIXEL_COUNT];
+    uint8_t quantized_weights_f[MAX_PIXEL_COUNT];
 
     if (mincol_quant == maxcol_quant)
     {
@@ -901,10 +918,9 @@ void encode_block_int(
             decimal res_f = diff_f.dot(ep_sc32_f);
             ideal_weights_f[i] = res_f;
 
-            // clamp is necessary because the min/max values shrank inwards due
-            // to inset / quantization but the pixels didn't
-            // Vec3u8 diff = satsub(block_u8[i], mincol);
             Vec3u8 diff = block_u8[i] - mincol;
+            // overflow protection (can happen with mincol rounding and inset)
+            // diff = min3u8(diff, block_u8[i]);
 
             // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
             // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
@@ -921,7 +937,15 @@ void encode_block_int(
             printf("  %+13.8f", res_fi - (double)(res_f));
             printf("\n");
 
-            sqerr += ((decimal)res_fi - res_f) * ((decimal)res_fi - res_f);
+            decimal err = (decimal)res_fi - res_f;
+            sqerr += err * err;
+
+            if (fabs(err) > F(0.1))
+            {
+                printf("Large error! blk: %3d %3d %3d  mincol: %3d %3d %3d\n",
+                    block_u8[i].x, block_u8[i].y, block_u8[i].z,
+                    mincol.x, mincol.y, mincol.z);
+            }
         }
 
         printf("sqerr: %.8f\n", (double)sqerr);
@@ -952,6 +976,17 @@ void encode_block_int(
         }
 
         printf("sqerr: %.8f\n", (double)sqerr);
+
+        // Quantize weights
+        printf("\nQuantized weights\n");
+
+        for (int i = 0; i < wgt_count; ++i)
+        {
+            quantized_weights[i] = quantize_2b_u8(downsampled_weights[i]);
+            quantized_weights_f[i] = quantize_2b(downsampled_weights_f[i]);
+
+            printf("%3d:  flt: %3d  u8: %3d\n", i, quantized_weights_f[i], quantized_weights[i]);
+        }
     }
 }
 
