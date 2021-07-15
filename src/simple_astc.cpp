@@ -745,6 +745,10 @@ void encode_block_int(
             block_u8[i].y = block_pixels[NCH_RGB * i + 1];
             block_u8[i].z = block_pixels[NCH_RGB * i + 2];
 
+            block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(256.0);
+            block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(256.0);
+            block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(256.0);
+
             // TODO (maybe): min/max without branching
             // https://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
             tmp_min[0] = u8min(tmp_min[0], block_u8[i].x);
@@ -783,6 +787,7 @@ void encode_block_int(
     } else {
         // Downsample and quantize the weights
         uint8_t downsampled_weights[MAX_PIXEL_COUNT];
+        decimal downsampled_weights_f[MAX_PIXEL_COUNT];
 
         // Move the endpoints line segment such that mincol is at zero
         Vec3u8 ep_vec = maxcol - mincol;
@@ -887,17 +892,14 @@ void encode_block_int(
         print_fixed("one:", one, q_frac);
 
         uint8_t ideal_weights[MAX_PIXEL_COUNT];
+        decimal ideal_weights_f[MAX_PIXEL_COUNT];
         decimal sqerr = F(0.0);
+
         for (int i = 0; i < pixel_count; ++i)
         {
-            Vec3f px_f = {
-                (decimal)(block_pixels[NCH_RGB * i]) / F(256.0),
-                (decimal)(block_pixels[NCH_RGB * i + 1]) / F(256.0),
-                (decimal)(block_pixels[NCH_RGB * i + 2]) / F(256.0),
-            };
-
-            Vec3f diff_f = px_f - mincol_f;
+            Vec3f diff_f = block_flt[i] - mincol_f;
             decimal res_f = diff_f.dot(ep_sc32_f);
+            ideal_weights_f[i] = res_f;
 
             // clamp is necessary because the min/max values shrank inwards due
             // to inset / quantization but the pixels didn't
@@ -921,13 +923,35 @@ void encode_block_int(
 
             sqerr += ((decimal)res_fi - res_f) * ((decimal)res_fi - res_f);
         }
-        printf("sqerr: %f\n", (double)sqerr);
+
+        printf("sqerr: %.8f\n", (double)sqerr);
 
         // We downsample the weight grid before quantization
         bilin::downsample_12x12_to_8x5_u8(
             ideal_weights,
             downsampled_weights
         );
+
+        bilin::downsample_12x12_to_8x5(
+            ideal_weights_f,
+            downsampled_weights_f
+        );
+
+        printf("\nDownsampled weights\n");
+        sqerr = F(0.0);
+
+        for (int i = 0; i < wgt_grid_w*wgt_grid_h; ++i)
+        {
+            decimal wgt_f = downsampled_weights_f[i];
+            decimal wgt_fi = (decimal)(fixed_to_double(downsampled_weights[i], 8));
+            decimal diff = wgt_fi - wgt_f;
+            sqerr += diff * diff;
+
+            printf("%3d:  flt: %10.8f  u8: %10.8f  diff: %+11.8f\n",
+                i, (double)wgt_f, (double)wgt_fi, (double)(diff));
+        }
+
+        printf("sqerr: %.8f\n", (double)sqerr);
     }
 }
 
