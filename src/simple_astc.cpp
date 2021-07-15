@@ -743,6 +743,194 @@ void encode_block_int(
 
     constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
 
+    Vec3u8 block_u8[MAX_PIXEL_COUNT];
+    // using tmp values to allow vectorization
+    uint8_t tmp_min[3] = { 255, 255, 255 };
+    uint8_t tmp_max[3] = { 0, 0, 0 };
+    {
+        ZoneScopedN("minmax");
+#ifdef ANDROID
+        #pragma clang loop vectorize_width(4, scalable)
+        #pragma clang loop interleave_count(2)
+#endif  // ANDROID
+        for (int i = 0; i < pixel_count; ++i) {
+            block_u8[i].x = block_pixels[NCH_RGB * i];
+            block_u8[i].y = block_pixels[NCH_RGB * i + 1];
+            block_u8[i].z = block_pixels[NCH_RGB * i + 2];
+
+            // TODO (maybe): min/max without branching
+            // https://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
+            tmp_min[0] = u8min(tmp_min[0], block_u8[i].x);
+            tmp_min[1] = u8min(tmp_min[1], block_u8[i].y);
+            tmp_min[2] = u8min(tmp_min[2], block_u8[i].z);
+            tmp_max[0] = u8max(tmp_max[0], block_u8[i].x);
+            tmp_max[1] = u8max(tmp_max[1], block_u8[i].y);
+            tmp_max[2] = u8max(tmp_max[2], block_u8[i].z);
+        }
+    }
+    Vec3u8 mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
+    Vec3u8 maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
+
+    // inset bounding box
+    // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
+    // mincol = satadd(mincol, inset);
+    // maxcol = satsub(maxcol, inset);
+
+    // Quantize endpoints
+    Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
+    Vec3u8 maxcol_quant = quantize_5b_u8(&maxcol);
+
+    uint8_t quantized_weights[MAX_PIXEL_COUNT];
+    uint8_t quantized_weights_f[MAX_PIXEL_COUNT];
+
+    if (mincol_quant == maxcol_quant)
+    {
+        // When both endpoints are the same, encode all weights and zeros and
+        // skip the calculation
+        for (int i = 0; i < wgt_count; ++i)
+        {
+            quantized_weights[i] = 0;
+        }
+    } else {
+        // Downsample and quantize the weights
+        uint8_t downsampled_weights[MAX_PIXEL_COUNT];
+
+        // Move the endpoints line segment such that mincol is at zero
+        Vec3u8 ep_vec = maxcol - mincol;
+
+        // Projection of pixels onto ep_vec to get the ideal weights
+        uint32_t ep_dot = ep_vec.dot32(ep_vec);     // Q2.16
+
+        // Q10.22, max. value 1024 for 5b quant
+        uint32_t inv_ep_dot = approx_inv32(ep_dot);
+
+        // The scaled ep_vec can be max. 32 due to 5b quantization
+        Vec3u32 ep_sc32 = {
+            ep_vec.x * (inv_ep_dot >> 8),  // Q0.8 * Q10.14 = Q10.22
+            ep_vec.y * (inv_ep_dot >> 8),
+            ep_vec.z * (inv_ep_dot >> 8),
+        };
+
+        Vec3u8 log2ep = {
+            (uint8_t)(log2(ep_sc32.x)),
+            (uint8_t)(log2(ep_sc32.y)),
+            (uint8_t)(log2(ep_sc32.z)),
+        };
+
+        uint8_t sc = u8max(u8max(log2ep.x, log2ep.y), log2ep.z); // highest bit set
+        uint8_t q_int = sc >= 21 ? sc - 21 : 0;       // no. integer bits
+        uint8_t q_frac = q_int <= 8 ? 8 - q_int : 8;  // no. fractional bits
+        uint8_t shr = 14 + q_int;                     // how much to shift right
+
+        Vec3u8 ep_sc8 = {
+            (uint8_t)(ep_sc32.x >> shr),
+            (uint8_t)(ep_sc32.y >> shr),
+            (uint8_t)(ep_sc32.z >> shr),
+        };
+
+        uint32_t one = (1 << (8 - q_int)) - 1;
+
+        uint8_t ideal_weights[MAX_PIXEL_COUNT];
+
+        for (int i = 0; i < pixel_count; ++i)
+        {
+            Vec3u8 diff = block_u8[i] - mincol;
+            // overflow protection (can happen with mincol rounding and inset)
+            // diff = min3u8(diff, block_u8[i]);
+
+            // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
+            // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
+            // recover lost precision by adding one
+            uint16_t res = diff.sataccdot(ep_sc8, one);
+            ideal_weights[i] = (uint8_t)(res >> (8 - q_int));  // -> Q0.8
+        }
+
+        // We downsample the weight grid before quantization
+        bilin::downsample_12x12_to_8x5_u8(
+            ideal_weights,
+            downsampled_weights
+        );
+
+        // Quantize weights
+        for (int i = 0; i < wgt_count; ++i)
+        {
+            quantized_weights[i] = quantize_2b_u8(downsampled_weights[i]);
+        }
+    }
+
+    // Output buffers for quantized weights and output data
+	uint8_t wgt_buf[16];
+	uint8_t out_buf[16];
+    for (int i = 0; i < 16; ++i)
+    {
+        wgt_buf[i] = 0;
+        out_buf[i] = 0;
+    }
+
+    // weights ISE encoding
+    int off = 0;
+    for (int i = 0; i < wgt_count; ++i)
+    {
+        write_bits(quantized_weights[i], wgt_bits, off, wgt_buf);
+        off += wgt_bits;
+    }
+
+    // write out weights
+    for (int i = 0; i < 16; ++i)
+    {
+        out_buf[i] = bitrev8(wgt_buf[15-i]);
+    }
+
+    // write out mode, partition, CEM
+    write_bits(block_mode, 11, 0, out_buf);
+    const int partition_count = 1;
+    write_bits(partition_count - 1, 2, 11, out_buf);
+    const int color_format = 8;
+    write_bits(color_format, 4, 13, out_buf);
+
+    // Quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
+    uint8_t endpoints_q[6] = {
+        (uint8_t)(mincol_quant.x),
+        (uint8_t)(maxcol_quant.x),
+        (uint8_t)(mincol_quant.y),
+        (uint8_t)(maxcol_quant.y),
+        (uint8_t)(mincol_quant.z),
+        (uint8_t)(maxcol_quant.z),
+    };
+
+    // write out endpoints
+    off = 17;  // starting bit position for endpoints data
+    for (int i = 0; i < 6; ++i)
+    {
+        write_bits(endpoints_q[i], ep_bits, off, out_buf);
+        off += ep_bits;
+    }
+
+    memcpy(out, out_buf, 16);
+}
+
+void encode_block_int_debug(
+    const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
+    uint32_t out[4]
+){
+    ZoneScopedN("enc_blk_astc");
+
+    constexpr uint16_t block_mode = 102;
+    constexpr uint8_t wgt_grid_w = 8;
+    constexpr uint8_t wgt_grid_h = 5;
+    constexpr uint8_t wgt_count = wgt_grid_w * wgt_grid_h;
+
+    // constexpr uint8_t color_quant_level = 11;  // range 32
+    constexpr uint8_t ep_bits = 5;
+    // constexpr uint8_t wgt_quant_mode = 2;      // range 4
+    constexpr uint8_t wgt_bits = 2;
+
+    constexpr uint8_t block_size_x = 12;
+    constexpr uint8_t block_size_y = 12;
+    constexpr uint8_t pixel_count = block_size_x * block_size_y;
+
+    constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
+
     printf("=== BLOCK ===\n");
 
     Vec3u8 block_u8[MAX_PIXEL_COUNT];
