@@ -781,7 +781,6 @@ void encode_block_int(
     Vec3u8 maxcol_quant = quantize_5b_u8(&maxcol);
 
     uint8_t quantized_weights[MAX_PIXEL_COUNT];
-    uint8_t quantized_weights_f[MAX_PIXEL_COUNT];
 
     if (mincol_quant == maxcol_quant)
     {
@@ -819,7 +818,6 @@ void encode_block_int(
 
         uint8_t sc = u8max(u8max(log2ep.x, log2ep.y), log2ep.z); // highest bit set
         uint8_t q_int = sc >= 21 ? sc - 21 : 0;       // no. integer bits
-        uint8_t q_frac = q_int <= 8 ? 8 - q_int : 8;  // no. fractional bits
         uint8_t shr = 14 + q_int;                     // how much to shift right
 
         Vec3u8 ep_sc8 = {
