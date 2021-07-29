@@ -587,34 +587,39 @@ inline void print_fixed8(const char *pre, unsigned int x, unsigned int frac)
     printf("  %12.8f", xfi);
 }
 
-#endif // NDEBUG
+#endif // not NDEBUG
 
- /* Approximate 1/x in fixed point arithmetic.
+/* Compute log2 (i.e., the position of the highest bit set) */
+inline uint32_t log2(uint32_t x)
+{
+    uint32_t res = (x > 0xffff) << 4;
+    x >>= res;
+
+    uint32_t shift = (x > 0xff) << 3;
+    x >>= shift;
+    res |= shift;
+
+    shift = (x > 0xf ) << 2;
+    x >>= shift;
+    res |= shift;
+
+    shift = (x > 0x3 ) << 1;
+    x >>= shift;
+    res |= shift;
+
+    res |= (x >> 1);
+
+    return res;
+}
+
+ /* Approximate 1/x in a fixed point arithmetic.
   *
-  * Assumes x is in Q2.16 format (unsigned). Returns Q10.22.
+  * Assumes x is in a Q2.16 format (unsigned). Returns Q10.22.
   */
 inline uint32_t approx_inv32(uint32_t x)
 {
-    uint32_t xx = x;
-
     // First, scale the input to be within [0.5, 1.0]
-    int32_t scale = (xx > 0xffff) << 4;
-    xx >>= scale;
-
-    uint32_t shift = (xx > 0xff) << 3;
-    xx >>= shift;
-    scale |= shift;
-
-    shift = (xx > 0xf ) << 2;
-    xx >>= shift;
-    scale |= shift;
-
-    shift = (xx > 0x3 ) << 1;
-    xx >>= shift;
-    scale |= shift;
-
-    scale |= (xx >> 1);  // now, scale is log2(x)
-    scale = 15 - scale;
+    const int32_t scale = 15 - (int32_t)log2(x);
 
     const uint32_t shl = (scale < 0) ?      0 : scale;
     const uint32_t shr = (scale < 0) ? -scale :     0;
@@ -651,29 +656,6 @@ inline uint32_t approx_inv32(uint32_t x)
     // The result is scaled down now, we need to scale it back
     y1 >>= 8; // Q10.22
     return (y1 << shl) >> shr;
-}
-
-/* Compute log2 (i.e., the position of the highest bit set) */
-inline uint32_t log2(uint32_t x)
-{
-    uint32_t scale = (x > 0xffff) << 4;
-    x >>= scale;
-
-    uint32_t shift = (x > 0xff) << 3;
-    x >>= shift;
-    scale |= shift;
-
-    shift = (x > 0xf ) << 2;
-    x >>= shift;
-    scale |= shift;
-
-    shift = (x > 0x3 ) << 1;
-    x >>= shift;
-    scale |= shift;
-
-    scale |= (x >> 1);
-
-    return scale;
 }
 
 }  // namespace simple

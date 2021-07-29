@@ -5,10 +5,11 @@
 
 using namespace simple;
 
+#ifndef NDEBUG
+
 /* Same as mathlib version but with debug prints */
 uint32_t approx_inv32_debug(uint32_t x)
 {
-
     // First, scale the input to be within [0.5, 1.0]
     int scale = (int)(log2(x));
     scale = 15 - scale;
@@ -85,6 +86,21 @@ void compute_inv(uint32_t x, double xf)
     printf("  %13.8f  %13.8f  %14.8f", gt, inv_x_fi, inv_x_fi - gt);
     printf("\n");
 }
+
+#else // not NDEBUG
+
+uint32_t approx_inv32_debug(uint32_t x)
+{
+    printf("Build and run in debug mode\n");
+    return 0;
+}
+
+void compute_inv(uint32_t x, double xf)
+{
+    printf("Build and run in debug mode\n");
+}
+
+#endif // not NDEBUG
 
 int main()
 {

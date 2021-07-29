@@ -1,3 +1,4 @@
+#include <cstring>
 #include <fstream>
 
 #include "platform.hpp"
@@ -366,7 +367,7 @@ Vec3i quantize_5b(Vec3f *vec)
     return Vec3i { quant_x, quant_y, quant_z };
 }
 
-/** Quantize a 5-bit integer vector into 5 bits (32 values) */
+/** Quantize an 8-bit integer vector into 5 bits (32 values) */
 Vec3u8 quantize_5b_u8(Vec3u8 *vec)
 {
     // TODO: investigate whether the rounding is worth it
@@ -414,7 +415,7 @@ void encode_block(
 
     constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
 
-    printf("=== BLOCK ===\n");
+    // printf("=== BLOCK ===\n");
 
     // Convert the block into floating point and determine the line through
     // color space
@@ -445,7 +446,7 @@ void encode_block(
     }
     Vec3f mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
     Vec3f maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
-    print_minmax("   ", mincol, maxcol);
+    // print_minmax("   ", mincol, maxcol);
 #else  // ASTC_TRIM_ENDPOINTS == 0
     // Trimmed method, min/max are selected so they are within avg+=2.0*stddev
     Vec3f sum = { F(0.0), F(0.0), F(0.0) };
@@ -487,13 +488,13 @@ void encode_block(
     //     print_minmax("swp", mincol, maxcol);
     // }
 #endif  // ASTC_SELECT_DIAG == 1
-    // inset_bbox(&mincol, &maxcol);
-    print_minmax("ins", mincol, maxcol);
+    inset_bbox(&mincol, &maxcol);
+    // print_minmax("ins", mincol, maxcol);
 
     // Quantize endpoints
     Vec3i mincol_int = quantize_5b(&mincol);
     Vec3i maxcol_int = quantize_5b(&maxcol);
-    print_minmax("qnt", mincol, maxcol);
+    // print_minmax("qnt", mincol, maxcol);
 
 #if ASTC_SELECT_DIAG == 1
     if ( (mincol_int.x + mincol_int.y + mincol_int.z)
@@ -531,22 +532,22 @@ void encode_block(
 
         // Move the endpoints line segment such that mincol is at zero
         Vec3f ep_vec = maxcol - mincol;
-        printf("    ep_vec: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
-            (double)ep_vec.x, (double)ep_vec.y, (double)ep_vec.z,
-            (double)(ep_vec.x * F(255.0)),
-            (double)(ep_vec.y * F(255.0)),
-            (double)(ep_vec.z * F(255.0))
-        );
+        // printf("    ep_vec: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+        //     (double)ep_vec.x, (double)ep_vec.y, (double)ep_vec.z,
+        //     (double)(ep_vec.x * F(255.0)),
+        //     (double)(ep_vec.y * F(255.0)),
+        //     (double)(ep_vec.z * F(255.0))
+        // );
 
-        decimal ep_dot = ep_vec.dot(ep_vec);
-        printf("    ep_dot:   %15.10f  %6.0f\n",
-            (double)(ep_dot), (double)(ep_dot * F(255.0))
-        );
+        // decimal ep_dot = ep_vec.dot(ep_vec);
+        // printf("    ep_dot:   %15.10f  %6.0f\n",
+        //     (double)(ep_dot), (double)(ep_dot * F(255.0))
+        // );
 
-        decimal inv_ep_dot = F(1.0) / ep_vec.dot(ep_vec);
-        printf("inv_ep_dot:   %15.10f  %6.0f\n",
-            (double)(inv_ep_dot), (double)(inv_ep_dot * F(255.0))
-        );
+        // decimal inv_ep_dot = F(1.0) / ep_vec.dot(ep_vec);
+        // printf("inv_ep_dot:   %15.10f  %6.0f\n",
+        //     (double)(inv_ep_dot), (double)(inv_ep_dot * F(255.0))
+        // );
 
         // To get projection of pixel onto ep_vec, we have to normalize. Second
         // normalization is for keeping the value between 0 and 1 =>
@@ -554,12 +555,12 @@ void encode_block(
         // With just 1 / sqrt(dot), the projected values in the following loop
         // would be between 0 and |ep_vec|.
         Vec3f ep_vec_scaled = ep_vec / ep_vec.dot(ep_vec);
-        printf(" ep_vec_sc: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
-            (double)ep_vec_scaled.x, (double)ep_vec_scaled.y, (double)ep_vec_scaled.z,
-            (double)(ep_vec_scaled.x * F(255.0)),
-            (double)(ep_vec_scaled.y * F(255.0)),
-            (double)(ep_vec_scaled.z * F(255.0))
-        );
+        // printf(" ep_vec_sc: %5.3f %5.3f %5.3f  %3.0f %3.0f %3.0f\n",
+        //     (double)ep_vec_scaled.x, (double)ep_vec_scaled.y, (double)ep_vec_scaled.z,
+        //     (double)(ep_vec_scaled.x * F(255.0)),
+        //     (double)(ep_vec_scaled.y * F(255.0)),
+        //     (double)(ep_vec_scaled.z * F(255.0))
+        // );
 
         // Project all pixels onto the endpoint vector. For each pixel, the result
         // tells how far it goes into the endpoint vector direction. Small values
@@ -568,7 +569,7 @@ void encode_block(
         // In other words, the resulting array is the array of ideal weights,
         // assuming there is no quantization.
         decimal ideal_weights[MAX_PIXEL_COUNT];
-        printf("%10s  %10s  %10s\n", "inp", "diff", "dot");
+        // printf("%10s  %10s  %10s\n", "inp", "diff", "dot");
         for (int i = 0; i < pixel_count; ++i)
         {
             // clamp is necessary because the min/max values shrank inwards due
@@ -579,12 +580,12 @@ void encode_block(
                 F(1.0)
             );
 
-            if (i < 2)
-            {
-                printf("%10.5f  %10.5f  %10.5f\n",
-                    (double)block_flt[i].x, (double)(block_flt[i].x - mincol.x),
-                    (double)ideal_weights[i]);
-            }
+            // if (i < 2)
+            // {
+            //     printf("%10.5f  %10.5f  %10.5f\n",
+            //         (double)block_flt[i].x, (double)(block_flt[i].x - mincol.x),
+            //         (double)ideal_weights[i]);
+            // }
         }
 
         // We downsample the weight grid before quantization
@@ -773,6 +774,7 @@ void encode_block_int(
 
     // inset bounding box
     Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
+    // TODO: This can end up with maxcol < mincol
     mincol = satadd(mincol, inset);
     maxcol = satsub(maxcol, inset);
 
@@ -780,19 +782,19 @@ void encode_block_int(
     Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
     Vec3u8 maxcol_quant = quantize_5b_u8(&maxcol);
 
-    uint8_t quantized_weights[MAX_PIXEL_COUNT];
+    uint8_t quantized_weights[wgt_count];
 
     if (mincol_quant == maxcol_quant)
     {
-        // When both endpoints are the same, encode all weights and zeros and
-        // skip the calculation
+        // When both endpoints are the same, encode all weights and zeros as
+        // skip the weight calculation
         for (int i = 0; i < wgt_count; ++i)
         {
             quantized_weights[i] = 0;
         }
     } else {
         // Downsample and quantize the weights
-        uint8_t downsampled_weights[MAX_PIXEL_COUNT];
+        uint8_t downsampled_weights[wgt_count];
 
         // Move the endpoints line segment such that mincol is at zero
         Vec3u8 ep_vec = maxcol - mincol;
@@ -907,331 +909,360 @@ void encode_block_int(
     memcpy(out, out_buf, 16);
 }
 
-void encode_block_int_debug(
-    const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
-    uint32_t out[4]
-){
-    ZoneScopedN("enc_blk_astc");
+// void encode_block_int_debug(
+//     const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
+//     uint32_t out[4]
+// ){
+//     ZoneScopedN("enc_blk_astc");
 
-    constexpr uint16_t block_mode = 102;
-    constexpr uint8_t wgt_grid_w = 8;
-    constexpr uint8_t wgt_grid_h = 5;
-    constexpr uint8_t wgt_count = wgt_grid_w * wgt_grid_h;
+//     constexpr uint16_t block_mode = 102;
+//     constexpr uint8_t wgt_grid_w = 8;
+//     constexpr uint8_t wgt_grid_h = 5;
+//     constexpr uint8_t wgt_count = wgt_grid_w * wgt_grid_h;
 
-    // constexpr uint8_t color_quant_level = 11;  // range 32
-    constexpr uint8_t ep_bits = 5;
-    // constexpr uint8_t wgt_quant_mode = 2;      // range 4
-    constexpr uint8_t wgt_bits = 2;
+//     // constexpr uint8_t color_quant_level = 11;  // range 32
+//     constexpr uint8_t ep_bits = 5;
+//     // constexpr uint8_t wgt_quant_mode = 2;      // range 4
+//     constexpr uint8_t wgt_bits = 2;
 
-    constexpr uint8_t block_size_x = 12;
-    constexpr uint8_t block_size_y = 12;
-    constexpr uint8_t pixel_count = block_size_x * block_size_y;
+//     constexpr uint8_t block_size_x = 12;
+//     constexpr uint8_t block_size_y = 12;
+//     constexpr uint8_t pixel_count = block_size_x * block_size_y;
 
-    constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
+//     constexpr uint8_t MAX_PIXEL_COUNT = MAX_BLOCK_DIM*MAX_BLOCK_DIM;
 
-    printf("=== BLOCK ===\n");
+//     printf("=== BLOCK ===\n");
 
-    Vec3u8 block_u8[MAX_PIXEL_COUNT];
-    Vec3f block_flt[MAX_PIXEL_COUNT];
-    // using tmp values to allow vectorization
-    uint8_t tmp_min[3] = { 255, 255, 255 };
-    uint8_t tmp_max[3] = { 0, 0, 0 };
-    {
-        ZoneScopedN("minmax");
-#ifdef ANDROID
-        #pragma clang loop vectorize_width(4, scalable)
-        #pragma clang loop interleave_count(2)
-#endif  // ANDROID
-        for (int i = 0; i < pixel_count; ++i) {
-            block_u8[i].x = block_pixels[NCH_RGB * i];
-            block_u8[i].y = block_pixels[NCH_RGB * i + 1];
-            block_u8[i].z = block_pixels[NCH_RGB * i + 2];
+//     Vec3u8 block_u8[MAX_PIXEL_COUNT];
+//     Vec3f block_flt[MAX_PIXEL_COUNT];
+//     // using tmp values to allow vectorization
+//     uint8_t tmp_min[3] = { 255, 255, 255 };
+//     uint8_t tmp_max[3] = { 0, 0, 0 };
+//     {
+//         ZoneScopedN("minmax");
+// #ifdef ANDROID
+//         #pragma clang loop vectorize_width(4, scalable)
+//         #pragma clang loop interleave_count(2)
+// #endif  // ANDROID
+//         for (int i = 0; i < pixel_count; ++i) {
+//             block_u8[i].x = block_pixels[NCH_RGB * i];
+//             block_u8[i].y = block_pixels[NCH_RGB * i + 1];
+//             block_u8[i].z = block_pixels[NCH_RGB * i + 2];
 
-            block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(256.0);
-            block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(256.0);
-            block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(256.0);
+//             block_flt[i].x = (decimal) block_pixels[NCH_RGB * i] / F(256.0);
+//             block_flt[i].y = (decimal) block_pixels[NCH_RGB * i + 1] / F(256.0);
+//             block_flt[i].z = (decimal) block_pixels[NCH_RGB * i + 2] / F(256.0);
 
-            // TODO (maybe): min/max without branching
-            // https://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
-            tmp_min[0] = u8min(tmp_min[0], block_u8[i].x);
-            tmp_min[1] = u8min(tmp_min[1], block_u8[i].y);
-            tmp_min[2] = u8min(tmp_min[2], block_u8[i].z);
-            tmp_max[0] = u8max(tmp_max[0], block_u8[i].x);
-            tmp_max[1] = u8max(tmp_max[1], block_u8[i].y);
-            tmp_max[2] = u8max(tmp_max[2], block_u8[i].z);
-        }
-    }
-    Vec3u8 mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
-    Vec3u8 maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
-    print_minmax("   ", mincol, maxcol);
+//             // TODO (maybe): min/max without branching
+//             // https://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
+//             tmp_min[0] = u8min(tmp_min[0], block_u8[i].x);
+//             tmp_min[1] = u8min(tmp_min[1], block_u8[i].y);
+//             tmp_min[2] = u8min(tmp_min[2], block_u8[i].z);
+//             tmp_max[0] = u8max(tmp_max[0], block_u8[i].x);
+//             tmp_max[1] = u8max(tmp_max[1], block_u8[i].y);
+//             tmp_max[2] = u8max(tmp_max[2], block_u8[i].z);
+//         }
+//     }
+//     Vec3u8 mincol = { tmp_min[0], tmp_min[1], tmp_min[2] };
+//     Vec3u8 maxcol = { tmp_max[0], tmp_max[1], tmp_max[2] };
+//     print_minmax("   ", mincol, maxcol);
 
-    // inset bounding box
-    Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
-    mincol = satadd(mincol, inset);
-    maxcol = satsub(maxcol, inset);
-    print_minmax("ins", mincol, maxcol);
+//     // inset bounding box
+//     // TODO: This can end up with maxcol < mincol
+//     // Vec3u8 inset = (maxcol - mincol) >> 4; // inset margin is 1/2 of 1/256th, too small
+//     // mincol = satadd(mincol, inset);
+//     // maxcol = satsub(maxcol, inset);
+//     print_minmax("ins", mincol, maxcol);
 
-    // Quantize endpoints
-    Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
-    Vec3u8 maxcol_quant = quantize_5b_u8(&maxcol);
-    print_minmax("qnt", mincol, maxcol);
+//     // Quantize endpoints
+//     Vec3u8 mincol_quant = quantize_5b_u8(&mincol);
+//     Vec3u8 maxcol_quant = quantize_5b_u8(&maxcol);
+//     print_minmax("qnt", mincol, maxcol);
+//     print_minmax("qnt", mincol_quant, maxcol_quant);
 
-    uint8_t quantized_weights[MAX_PIXEL_COUNT];
-    uint8_t quantized_weights_f[MAX_PIXEL_COUNT];
+//     uint8_t quantized_weights[MAX_PIXEL_COUNT];
+//     uint8_t quantized_weights_f[MAX_PIXEL_COUNT];
 
-    if (mincol_quant == maxcol_quant)
-    {
-        // When both endpoints are the same, encode all weights and zeros and
-        // skip the calculation
-        for (int i = 0; i < wgt_count; ++i)
-        {
-            quantized_weights[i] = 0;
-        }
-    } else {
-        // Downsample and quantize the weights
-        uint8_t downsampled_weights[MAX_PIXEL_COUNT];
-        decimal downsampled_weights_f[MAX_PIXEL_COUNT];
+//     if (mincol_quant == maxcol_quant)
+//     {
+//         // When both endpoints are the same, encode all weights and zeros and
+//         // skip the calculation
+//         for (int i = 0; i < wgt_count; ++i)
+//         {
+//             quantized_weights[i] = 0;
+//         }
+//     } else {
+//         // Downsample and quantize the weights
+//         uint8_t downsampled_weights[MAX_PIXEL_COUNT];
+//         decimal downsampled_weights_f[MAX_PIXEL_COUNT];
 
-        // Move the endpoints line segment such that mincol is at zero
-        Vec3u8 ep_vec = maxcol - mincol;
-        printf("        ep: %3d %3d %3d\n", ep_vec.x, ep_vec.y, ep_vec.z);
+//         // Move the endpoints line segment such that mincol is at zero
+//         Vec3u8 ep_vec = maxcol - mincol;
+//         printf("        ep: %3d %3d %3d\n", ep_vec.x, ep_vec.y, ep_vec.z);
 
-        Vec3f ep_vec_f = {
-            (decimal)(ep_vec.x) / F(256.0),
-            (decimal)(ep_vec.y) / F(256.0),
-            (decimal)(ep_vec.z) / F(256.0),
-        };
+//         Vec3f ep_vec_f = {
+//             (decimal)(ep_vec.x) / F(256.0),
+//             (decimal)(ep_vec.y) / F(256.0),
+//             (decimal)(ep_vec.z) / F(256.0),
+//         };
 
-        // Projection of pixels onto ep_vec to get the ideal weights
-        // uint16_t ep_dot = ep_vec.dot16(ep_vec);     // Q2.14
-        uint32_t ep_dot = ep_vec.dot32(ep_vec);     // Q2.16
-        print_fixed("    ep_dot:", ep_dot, 16);
-        // printf("  ep_dot16: %8d  ", ep_dot);
-        // print_bin_(ep_dot, 32, 16);
-        // printf("  %13.8f\n", fixed_to_double(ep_dot, 16));
+//         // Projection of pixels onto ep_vec to get the ideal weights
+//         // uint16_t ep_dot = ep_vec.dot16(ep_vec);     // Q2.14
+//         uint32_t ep_dot = ep_vec.dot32(ep_vec);     // Q2.16
+//         print_fixed("    ep_dot:", ep_dot, 16);
+//         // printf("  ep_dot16: %8d  ", ep_dot);
+//         // print_bin_(ep_dot, 32, 16);
+//         // printf("  %13.8f\n", fixed_to_double(ep_dot, 16));
 
-        decimal ep_dot_f = ep_vec_f.dot(ep_vec_f);
+//         decimal ep_dot_f = ep_vec_f.dot(ep_vec_f);
 
-        // ep_dot = rshift_round(ep_dot, 6); // Q8.8 with rounding
-        // printf("   ep_dot8: %3d \n", ep_dot);
+//         // ep_dot = rshift_round(ep_dot, 6); // Q8.8 with rounding
+//         // printf("   ep_dot8: %3d \n", ep_dot);
 
-        // uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec), Q8.8
-        // Q10.22, max. value 1024 for 5b quant
-        uint32_t inv_ep_dot = approx_inv32(ep_dot);
-        print_fixed("inv_ep_dot:", inv_ep_dot, 22);
-        // print_bin_(ep_dot, 32, 22);
-        // printf("  %13.8f\n", fixed_to_double(inv_ep_dot, 22));
-        // print_bin_(inv_ep_dot, 32, 8);
-        // printf("\n");
+//         // uint16_t inv_ep_dot = approx_inv(ep_dot);   // 1 / ep_vec.dot(ep_vec), Q8.8
+//         // Q10.22, max. value 1024 for 5b quant
+//         uint32_t inv_ep_dot = approx_inv32(ep_dot);
+//         print_fixed("inv_ep_dot:", inv_ep_dot, 22);
+//         // print_bin_(ep_dot, 32, 22);
+//         // printf("  %13.8f\n", fixed_to_double(inv_ep_dot, 22));
+//         // print_bin_(inv_ep_dot, 32, 8);
+//         // printf("\n");
 
-        decimal inv_ep_dot_f = F(1.0) / ep_dot_f;
+//         decimal inv_ep_dot_f = F(1.0) / ep_dot_f;
 
-        // uint32_t ep_vec32_x = ep_vec.x << 14; // Q0.8 -> Q0.22
-        // uint32_t ep_vec32_y = ep_vec.y << 14;
-        // uint32_t ep_vec32_z = ep_vec.z << 14;
-        // printf("ep.x:\n");
-        // print_bin_(ep_vec.x, 32, 8);
-        // printf("\n");
-        // print_bin_(ep_vec32_x, 32, 22);
-        // printf("\n");
+//         // uint32_t ep_vec32_x = ep_vec.x << 14; // Q0.8 -> Q0.22
+//         // uint32_t ep_vec32_y = ep_vec.y << 14;
+//         // uint32_t ep_vec32_z = ep_vec.z << 14;
+//         // printf("ep.x:\n");
+//         // print_bin_(ep_vec.x, 32, 8);
+//         // printf("\n");
+//         // print_bin_(ep_vec32_x, 32, 22);
+//         // printf("\n");
 
-        // Vec3u16 ep_vec_scaled = {
-        //     (uint16_t)(rshift_round(ep_vec.x * inv_ep_dot, 8)),
-        //     (uint16_t)(rshift_round(ep_vec.y * inv_ep_dot, 8)),
-        //     (uint16_t)(rshift_round(ep_vec.z * inv_ep_dot, 8)),
-        // };
-        // printf("     ep_sc: %3d %3d %3d\n", ep_vec_scaled.x, ep_vec_scaled.y, ep_vec_scaled.z);
+//         // Vec3u16 ep_vec_scaled = {
+//         //     (uint16_t)(rshift_round(ep_vec.x * inv_ep_dot, 8)),
+//         //     (uint16_t)(rshift_round(ep_vec.y * inv_ep_dot, 8)),
+//         //     (uint16_t)(rshift_round(ep_vec.z * inv_ep_dot, 8)),
+//         // };
+//         // printf("     ep_sc: %3d %3d %3d\n", ep_vec_scaled.x, ep_vec_scaled.y, ep_vec_scaled.z);
 
-        // The scaled ep_vec can be max. 32 due to 5b quantization
-        Vec3u32 ep_sc32 = {
-            ep_vec.x * (inv_ep_dot >> 8),  // Q0.8 * Q10.14 = Q10.22
-            ep_vec.y * (inv_ep_dot >> 8),
-            ep_vec.z * (inv_ep_dot >> 8),
-        };
+//         // The scaled ep_vec can be max. 32 due to 5b quantization
+//         Vec3u32 ep_sc32 = {
+//             ep_vec.x * (inv_ep_dot >> 8),  // Q0.8 * Q10.14 = Q10.22
+//             ep_vec.y * (inv_ep_dot >> 8),
+//             ep_vec.z * (inv_ep_dot >> 8),
+//         };
 
-        Vec3f ep_sc32_f = ep_vec_f * inv_ep_dot_f;
+//         Vec3f ep_sc32_f = ep_vec_f * inv_ep_dot_f;
 
-        Vec3u8 log2ep = {
-            (uint8_t)(log2(ep_sc32.x)),
-            (uint8_t)(log2(ep_sc32.y)),
-            (uint8_t)(log2(ep_sc32.z)),
-        };
+//         Vec3u8 log2ep = {
+//             (uint8_t)(log2(ep_sc32.x)),
+//             (uint8_t)(log2(ep_sc32.y)),
+//             (uint8_t)(log2(ep_sc32.z)),
+//         };
 
-        uint8_t sc = u8max(u8max(log2ep.x, log2ep.y), log2ep.z); // highest bit set
-        uint8_t q_int = sc >= 21 ? sc - 21 : 0;       // no. integer bits
-        uint8_t q_frac = q_int <= 8 ? 8 - q_int : 8;  // no. fractional bits
-        uint8_t shr = 14 + q_int;                     // how much to shift right
-        printf("largest bit set of ep_sc32: %d,  shift right by %d\n", sc, shr);
+//         uint8_t sc = u8max(u8max(log2ep.x, log2ep.y), log2ep.z); // highest bit set
+//         uint8_t q_int = sc >= 21 ? sc - 21 : 0;       // no. integer bits
+//         uint8_t q_frac = q_int <= 8 ? 8 - q_int : 8;  // no. fractional bits
+//         uint8_t shr = 14 + q_int;                     // how much to shift right
+//         printf("largest bit set of ep_sc32: %d,  shift right by %d\n", sc, shr);
 
-        Vec3u8 ep_sc8 = {
-            (uint8_t)(ep_sc32.x >> shr),
-            (uint8_t)(ep_sc32.y >> shr),
-            (uint8_t)(ep_sc32.z >> shr),
-        };
+//         Vec3u8 ep_sc8 = {
+//             (uint8_t)(ep_sc32.x >> shr),
+//             (uint8_t)(ep_sc32.y >> shr),
+//             (uint8_t)(ep_sc32.z >> shr),
+//         };
 
-        printf("ep_sc:\n");
-        printf("x, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.x, fixed_to_double(ep_sc32.x, 22));
-        print_bin_(ep_sc32.x, 32, 22);
-        printf("  Q%d.%d: %11.8f\n", q_int, q_frac, fixed_to_double(ep_sc8.x, q_frac));
-        printf("y, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.y, fixed_to_double(ep_sc32.y, 22));
-        print_bin_(ep_sc32.y, 32, 22);
-        printf("  Q%d.%d: %11.8f\n", q_int, q_frac, fixed_to_double(ep_sc8.y, q_frac));
-        printf("z, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.z, fixed_to_double(ep_sc32.z, 22));
-        print_bin_(ep_sc32.z, 32, 22);
-        printf("  Q%d.%d: %11.8f\n", q_int, q_frac, fixed_to_double(ep_sc8.z, q_frac));
+//         printf("ep_sc:");
+//         printf("\nx, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.x, fixed_to_double(ep_sc32.x, 22));
+//         print_bin_(ep_sc32.x, 32, 22);
+//         printf("  Q%d.%d: %11.8f  ", q_int, q_frac, fixed_to_double(ep_sc8.x, q_frac));
+//         print_bin_(ep_sc8.x, 8, q_frac);
 
-        // printf("y, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
-        //     (double)ep_sc32_f.y, fixed_to_double(ep_sc32.y, 22), fixed_to_double(ep_sc8.y, 3));
-        // printf("z, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
-        //     (double)ep_sc32_f.z, fixed_to_double(ep_sc32.z, 22), fixed_to_double(ep_sc8.z, 3));
+//         printf("\ny, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.y, fixed_to_double(ep_sc32.y, 22));
+//         print_bin_(ep_sc32.y, 32, 22);
+//         printf("  Q%d.%d: %11.8f  ", q_int, q_frac, fixed_to_double(ep_sc8.y, q_frac));
+//         print_bin_(ep_sc8.y, 8, q_frac);
 
-        Vec3f mincol_f = {
-            (decimal)(mincol.x) / F(256.0),
-            (decimal)(mincol.y) / F(256.0),
-            (decimal)(mincol.z) / F(256.0),
-        };
+//         printf("\nz, gt: %11.8f  Q10.22: %11.8f  ", (double)ep_sc32_f.z, fixed_to_double(ep_sc32.z, 22));
+//         print_bin_(ep_sc32.z, 32, 22);
+//         printf("  Q%d.%d: %11.8f  ", q_int, q_frac, fixed_to_double(ep_sc8.z, q_frac));
+//         print_bin_(ep_sc8.z, 8, q_frac);
+//         printf("\n");
 
-        uint32_t one = (1 << (8 - q_int)) - 1;
-        print_fixed("one:", one, q_frac);
+//         // printf("y, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
+//         //     (double)ep_sc32_f.y, fixed_to_double(ep_sc32.y, 22), fixed_to_double(ep_sc8.y, 3));
+//         // printf("z, gt: %11.8f  Q10.22: %11.8f  Q5.3: %11.8f\n",
+//         //     (double)ep_sc32_f.z, fixed_to_double(ep_sc32.z, 22), fixed_to_double(ep_sc8.z, 3));
 
-        uint8_t ideal_weights[MAX_PIXEL_COUNT];
-        decimal ideal_weights_f[MAX_PIXEL_COUNT];
-        decimal sqerr = F(0.0);
+//         Vec3f mincol_f = {
+//             (decimal)(mincol.x) / F(256.0),
+//             (decimal)(mincol.y) / F(256.0),
+//             (decimal)(mincol.z) / F(256.0),
+//         };
 
-        for (int i = 0; i < pixel_count; ++i)
-        {
-            Vec3f diff_f = block_flt[i] - mincol_f;
-            decimal res_f = diff_f.dot(ep_sc32_f);
-            ideal_weights_f[i] = res_f;
+//         uint32_t one = (1 << (8 - q_int)) - 1;
+//         print_fixed("one:", one, q_frac);
 
-            // overflow protection (can happen with mincol rounding and inset)
-            Vec3u8 px = max3u8(block_u8[i], mincol);
-            Vec3u8 diff = px - mincol;
+//         uint8_t ideal_weights[MAX_PIXEL_COUNT];
+//         decimal ideal_weights_f[MAX_PIXEL_COUNT];
+//         decimal sqerr = F(0.0);
 
-            // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
-            // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
-            // recover lost precision by adding one
-            uint16_t res = diff.sataccdot(ep_sc8, one);
-            ideal_weights[i] = (uint8_t)(res >> (8 - q_int));  // -> Q0.8
+//         for (int i = 0; i < pixel_count; ++i)
+//         {
+//             Vec3f diff_f = block_flt[i] - mincol_f;
+//             decimal res_f = diff_f.dot(ep_sc32_f);
+//             ideal_weights_f[i] = res_f;
 
-            printf("%3d:", i);
-            print_fixed8("   diff.x", diff.x, 8);
-            print_fixed8("  |  diff.y", diff.y, 8);
-            print_fixed8("  |  diff.z", diff.z, 8);
-            print_fixed8("  |  res", ideal_weights[i], 8);
-            double res_fi = fixed_to_double(ideal_weights[i], 8);
-            printf("  %+13.8f", res_fi - (double)(res_f));
-            printf("\n");
+//             // overflow protection (can happen with mincol rounding and inset)
+//             Vec3u8 px = max3u8(block_u8[i], mincol);
+//             Vec3u8 diff = px - mincol;
+//             // printf("0xff%02x%02x%02x\n", px.z, px.y, px.x);
 
-            decimal err = (decimal)res_fi - res_f;
-            sqerr += err * err;
+//             // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
+//             // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
+//             // recover lost precision by adding one
+//             uint16_t res = diff.sataccdot(ep_sc8, one);
+//             ideal_weights[i] = (uint8_t)(res >> (8 - q_int));  // -> Q0.8
 
-            if (fabs(err) > F(0.1))
-            {
-                printf("Large error! blk: %3d %3d %3d  mincol: %3d %3d %3d\n",
-                    block_u8[i].x, block_u8[i].y, block_u8[i].z,
-                    mincol.x, mincol.y, mincol.z);
-            }
-        }
+//             printf("%3d:", i);
+//             print_fixed8("   diff.x", diff.x, 8);
+//             printf("  %#04x", diff.x);
+//             print_fixed8("  |  diff.y", diff.y, 8);
+//             printf("  %#04x", diff.y);
+//             print_fixed8("  |  diff.z", diff.z, 8);
+//             printf("  %#04x", diff.z);
+//             print_fixed8("  |  res", ideal_weights[i], 8);
+//             printf("  %#04x", ideal_weights[i]);
+//             double res_fi = fixed_to_double(ideal_weights[i], 8);
+//             printf("  %+13.8f", res_fi - (double)(res_f));
+//             printf("\n");
 
-        printf("sqerr: %.8f\n", (double)sqerr);
+//             decimal err = (decimal)res_fi - res_f;
+//             sqerr += err * err;
 
-        // We downsample the weight grid before quantization
-        bilin::downsample_12x12_to_8x5_u8(
-            ideal_weights,
-            downsampled_weights
-        );
+//             if (fabs(err) > F(0.1))
+//             {
+//                 printf("Large error! blk: %3d %3d %3d  mincol: %3d %3d %3d\n",
+//                     block_u8[i].x, block_u8[i].y, block_u8[i].z,
+//                     mincol.x, mincol.y, mincol.z);
+//             }
+//         }
 
-        bilin::downsample_12x12_to_8x5(
-            ideal_weights_f,
-            downsampled_weights_f
-        );
+//         printf("sqerr: %.8f\n", (double)sqerr);
 
-        printf("\nDownsampled weights\n");
-        sqerr = F(0.0);
+//         // We downsample the weight grid before quantization
+//         bilin::downsample_12x12_to_8x5_u8(
+//             ideal_weights,
+//             downsampled_weights
+//         );
 
-        for (int i = 0; i < wgt_grid_w*wgt_grid_h; ++i)
-        {
-            decimal wgt_f = downsampled_weights_f[i];
-            decimal wgt_fi = (decimal)(fixed_to_double(downsampled_weights[i], 8));
-            decimal diff = wgt_fi - wgt_f;
-            sqerr += diff * diff;
+//         bilin::downsample_12x12_to_8x5(
+//             ideal_weights_f,
+//             downsampled_weights_f
+//         );
 
-            printf("%3d:  flt: %10.8f  u8: %10.8f  diff: %+11.8f\n",
-                i, (double)wgt_f, (double)wgt_fi, (double)(diff));
-        }
+//         printf("\nDownsampled weights\n");
+//         sqerr = F(0.0);
 
-        printf("sqerr: %.8f\n", (double)sqerr);
+//         for (int i = 0; i < wgt_grid_w*wgt_grid_h; ++i)
+//         {
+//             decimal wgt_f = downsampled_weights_f[i];
+//             decimal wgt_f_u8 = wgt_f * F(256.0);
+//             decimal wgt_fi = (decimal)(fixed_to_double(downsampled_weights[i], 8));
+//             decimal diff = wgt_fi - wgt_f;
+//             sqerr += diff * diff;
 
-        // Quantize weights
-        printf("\nQuantized weights\n");
-        int nerr = 0;
+//             printf("%3d:  flt: %10.8f  %3.0f  u8: %10.8f  %3d  diff: %+11.8f\n",
+//                 i, (double)wgt_f, (double)wgt_f_u8, (double)wgt_fi,
+//                 downsampled_weights[i], (double)(diff));
+//         }
 
-        for (int i = 0; i < wgt_count; ++i)
-        {
-            quantized_weights[i] = quantize_2b_u8(downsampled_weights[i]);
-            quantized_weights_f[i] = quantize_2b(downsampled_weights_f[i]);
+//         printf("sqerr: %.8f\n", (double)sqerr);
 
-            printf("%3d:  flt: %3d  u8: %3d", i, quantized_weights_f[i], quantized_weights[i]);
-            if (quantized_weights[i] != quantized_weights_f[i])
-            {
-                ++nerr;
-                printf("  <--");
-            }
-            printf("\n");
-        }
-        printf("nerr: %d\n", nerr);
-    }
+//         // Quantize weights
+//         printf("\nQuantized weights\n");
+//         int nerr = 0;
 
-    // Output buffers for quantized weights and output data
-	uint8_t wgt_buf[16];
-	uint8_t out_buf[16];
-    for (int i = 0; i < 16; ++i)
-    {
-        wgt_buf[i] = 0;
-        out_buf[i] = 0;
-    }
+//         for (int i = 0; i < wgt_count; ++i)
+//         {
+//             quantized_weights[i] = quantize_2b_u8(downsampled_weights[i]);
+//             quantized_weights_f[i] = quantize_2b(downsampled_weights_f[i]);
 
-    // weights ISE encoding
-    int off = 0;
-    for (int i = 0; i < wgt_count; ++i)
-    {
-        write_bits(quantized_weights[i], wgt_bits, off, wgt_buf);
-        off += wgt_bits;
-    }
+//             printf("%3d:  flt: %3d  u8: %3d", i, quantized_weights_f[i], quantized_weights[i]);
+//             if (quantized_weights[i] != quantized_weights_f[i])
+//             {
+//                 ++nerr;
+//                 printf("  <--");
+//             }
+//             printf("\n");
+//         }
+//         printf("nerr: %d\n", nerr);
+//     }
 
-    // write out weights
-    for (int i = 0; i < 16; ++i)
-    {
-        out_buf[i] = bitrev8(wgt_buf[15-i]);
-    }
+//     // Output buffers for quantized weights and output data
+//     uint8_t wgt_buf[16];
+//     uint8_t out_buf[16];
+//     for (int i = 0; i < 16; ++i)
+//     {
+//         wgt_buf[i] = 0;
+//         out_buf[i] = 0;
+//     }
 
-    // write out mode, partition, CEM
-    write_bits(block_mode, 11, 0, out_buf);
-    const int partition_count = 1;
-    write_bits(partition_count - 1, 2, 11, out_buf);
-    const int color_format = 8;
-    write_bits(color_format, 4, 13, out_buf);
+//     // weights ISE encoding
+//     int off = 0;
+//     for (int i = 0; i < wgt_count; ++i)
+//     {
+//         write_bits(quantized_weights[i], wgt_bits, off, wgt_buf);
+//         off += wgt_bits;
+//     }
 
-    // Quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
-    uint8_t endpoints_q[6] = {
-        (uint8_t)(mincol_quant.x),
-        (uint8_t)(maxcol_quant.x),
-        (uint8_t)(mincol_quant.y),
-        (uint8_t)(maxcol_quant.y),
-        (uint8_t)(mincol_quant.z),
-        (uint8_t)(maxcol_quant.z),
-    };
+//     // write out weights
+//     for (int i = 0; i < 16; ++i)
+//     {
+//         out_buf[i] = bitrev8(wgt_buf[15-i]);
+//     }
 
-    // write out endpoints
-    off = 17;  // starting bit position for endpoints data
-    for (int i = 0; i < 6; ++i)
-    {
-        write_bits(endpoints_q[i], ep_bits, off, out_buf);
-        off += ep_bits;
-    }
+//     // write out mode, partition, CEM
+//     write_bits(block_mode, 11, 0, out_buf);
+//     const int partition_count = 1;
+//     write_bits(partition_count - 1, 2, 11, out_buf);
+//     const int color_format = 8;
+//     write_bits(color_format, 4, 13, out_buf);
 
-    memcpy(out, out_buf, 16);
-}
+//     // Quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
+//     uint8_t endpoints_q[6] = {
+//         (uint8_t)(mincol_quant.x),
+//         (uint8_t)(maxcol_quant.x),
+//         (uint8_t)(mincol_quant.y),
+//         (uint8_t)(maxcol_quant.y),
+//         (uint8_t)(mincol_quant.z),
+//         (uint8_t)(maxcol_quant.z),
+//     };
+
+//     // write out endpoints
+//     off = 17;  // starting bit position for endpoints data
+//     for (int i = 0; i < 6; ++i)
+//     {
+//         write_bits(endpoints_q[i], ep_bits, off, out_buf);
+//         off += ep_bits;
+//     }
+
+//     memcpy(out, out_buf, 16);
+
+//     printf("Out bytes:\n");
+//     for (int i = 0; i < 16; ++i)
+//     {
+//         if (out_buf[i] == 0)
+//         {
+//             printf("0x00 ");
+//         }
+//         else
+//         {
+//             printf("%#04x ", out_buf[i]);
+//         }
+//     }
+//     printf("\n");
+// }
 
 } // namespace simple::astc
