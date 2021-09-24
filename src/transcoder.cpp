@@ -200,7 +200,7 @@ int decode_image(
     const int nblocks_x = img_w / 4;
     const int nblocks_y = img_h / 4;
 
-    void (*decode_block)( const uint32_t[NCH_RGB*16], uint8_t[2] );
+    void (*decode_block)( const uint32_t*, uint8_t[NCH_RGB*16] );
 
     // Based on encoding format:
     //   1. Set encoded block size as a number of 32-bit integers
