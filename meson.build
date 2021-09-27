@@ -114,6 +114,8 @@ src_transcoder = [
   'src/transcoder.cpp',
   'src/simple_bilinear.cpp',
   'src/simple_astc.cpp',
+  'src/simple_astc_int.cpp',
+  'src/simple_astc_common.cpp',
   'src/simple_bc1.cpp',
   'src/simple_ycocg_bc3.cpp',
   'extern/tracy/TracyClient.cpp',

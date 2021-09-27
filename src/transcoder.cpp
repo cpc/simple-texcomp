@@ -143,7 +143,7 @@ int encode_image(
         break;
     case ASTC_INT:
         block_nints = 4; // 128 bits per block
-        encode_block = astc::encode_block_int;
+        // encode_block = astc::encode_block_int;
         break;
     default:
         LOGE("Unsupported encoding format\n");
@@ -164,22 +164,34 @@ int encode_image(
         {
             ZoneScopedN("loop_blk");
 
-            // Read 4x4 block of pixels into an array
-            uint8_t block_pixels[NCH_RGB*block_w*block_h];
-            const int x = block_x * block_w;
-            const int y = block_y * block_h;
-            for (int i = 0; i < block_h; ++i)
-            {
-                memcpy(
-                    block_pixels + (NCH_RGB * i * block_w),
-                    inp_pixels + (NCH_RGB * (img_w * (y+i) + x)),
-                    NCH_RGB * block_w
+            if (ENC_FORMAT != ASTC_INT) {
+                // Read 4x4 block of pixels into an array
+                uint8_t block_pixels[NCH_RGB*block_w*block_h];
+                const int x = block_x * block_w;
+                const int y = block_y * block_h;
+                for (int i = 0; i < block_h; ++i)
+                {
+                    memcpy(
+                        block_pixels + (NCH_RGB * i * block_w),
+                        inp_pixels + (NCH_RGB * (img_w * (y+i) + x)),
+                        NCH_RGB * block_w
+                    );
+                }
+
+                // Encode the block
+                const int offset = (nblocks_x * block_y + block_x) * block_nints;
+                encode_block(block_pixels, enc_data.data() + offset);
+            } else {
+                // Encode the block
+                const int offset = (nblocks_x * block_y + block_x) * block_nints;
+                astc::encode_block_int(
+                    inp_pixels,
+                    block_x,
+                    block_y,
+                    img_w,
+                    (uint8_t*)enc_data.data()
                 );
             }
-
-            // Encode the block
-            const int offset = (nblocks_x * block_y + block_x) * block_nints;
-            encode_block(block_pixels, enc_data.data() + offset);
         }
     }
 

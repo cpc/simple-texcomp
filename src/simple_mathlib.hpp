@@ -267,6 +267,123 @@ struct Vec3u8
     }
 };
 
+inline uint8_t satsub_u8(uint8_t lhs, uint8_t rhs)
+{
+    uint8_t res = lhs - rhs;
+
+    if (res > lhs)
+    {
+        res = 0;
+    }
+
+    return res;
+}
+
+inline uint8_t satadd_u8(uint8_t lhs, uint8_t rhs)
+{
+    uint8_t res = lhs + rhs;
+
+    if (res < lhs)
+    {
+        res = 255;
+    }
+
+    return res;
+}
+
+
+struct Vec4u8
+{
+    uint8_t x;
+    uint8_t y;
+    uint8_t z;
+    uint8_t w;
+
+    inline Vec4u8 operator-(const Vec4u8 &other) const
+    {
+        // can and will overflow
+        return Vec4u8 {
+            static_cast<uint8_t>(x - other.x),
+            static_cast<uint8_t>(y - other.y),
+            static_cast<uint8_t>(z - other.z),
+            static_cast<uint8_t>(w - other.w),
+        };
+    }
+
+    inline Vec4u8 operator+(const Vec4u8 &other) const
+    {
+        // can and will overflow
+        return Vec4u8 {
+            static_cast<uint8_t>(x + other.x),
+            static_cast<uint8_t>(y + other.y),
+            static_cast<uint8_t>(z + other.z),
+            static_cast<uint8_t>(w + other.w),
+        };
+    }
+
+    inline Vec4u8 operator+(uint8_t a) const
+    {
+        // can and will overflow
+        return Vec4u8 {
+            static_cast<uint8_t>(x + a),
+            static_cast<uint8_t>(y + a),
+            static_cast<uint8_t>(z + a),
+            static_cast<uint8_t>(w + a),
+        };
+    }
+
+    inline Vec4u8 operator>>(uint8_t nbits) const
+    {
+        return Vec4u8 {
+            static_cast<uint8_t>(x >> nbits),
+            static_cast<uint8_t>(y >> nbits),
+            static_cast<uint8_t>(z >> nbits),
+            static_cast<uint8_t>(w >> nbits),
+        };
+    }
+
+    inline Vec4u8 operator<<(uint8_t nbits) const
+    {
+        return Vec4u8 {
+            static_cast<uint8_t>(x << nbits),
+            static_cast<uint8_t>(y << nbits),
+            static_cast<uint8_t>(z << nbits),
+            static_cast<uint8_t>(w << nbits),
+        };
+    }
+
+    inline Vec4u8 operator|(Vec4u8 other) const
+    {
+        return Vec4u8 {
+            static_cast<uint8_t>(x | other.x),
+            static_cast<uint8_t>(y | other.y),
+            static_cast<uint8_t>(z | other.z),
+            static_cast<uint8_t>(w | other.w),
+        };
+    }
+
+    inline Vec4u8 satsub(const Vec4u8 &other) const
+    {
+        return Vec4u8 {
+            satsub_u8(x, other.x),
+            satsub_u8(y, other.y),
+            satsub_u8(z, other.z),
+            satsub_u8(w, other.w),
+        };
+    }
+
+    inline Vec4u8 satadd(uint8_t a)
+    {
+        return Vec4u8 {
+            satadd_u8(x, a),
+            satadd_u8(y, a),
+            satadd_u8(z, a),
+            satadd_u8(w, a),
+        };
+    }
+
+};
+
 struct Vec3u16
 {
     uint16_t x;
@@ -363,6 +480,37 @@ inline Vec3u8 max3u8(Vec3u8 a, Vec3u8 b)
         u8max(a.y, b.y),
         u8max(a.z, b.z),
     };
+}
+
+inline Vec4u8 min4u8(Vec4u8 a, Vec4u8 b)
+{
+    return Vec4u8 {
+        u8min(a.x, b.x),
+        u8min(a.y, b.y),
+        u8min(a.z, b.z),
+        u8min(a.w, b.w),
+    };
+}
+
+inline Vec4u8 max4u8(Vec4u8 a, Vec4u8 b)
+{
+    return Vec4u8 {
+        u8max(a.x, b.x),
+        u8max(a.y, b.y),
+        u8max(a.z, b.z),
+        u8max(a.w, b.w),
+    };
+}
+
+inline Vec4u8 shr_round_4u8(Vec4u8 inp, uint8_t amt)
+{
+    // amt &= 0b11111;
+
+    if (amt > 0) {
+        inp = inp.satadd(1 << (amt - 1));
+    }
+
+    return (inp >> amt);
 }
 
 inline Vec3f min3f(const Vec3f &a, const Vec3f &b)

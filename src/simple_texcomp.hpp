@@ -80,6 +80,22 @@ namespace astc {
     //     int weight_grid_x,
     //     int weight_grid_y
     // );
+    //
+
+    /* Routine to write up to 8 bits
+     * Borrowed from astcenc: https://github.com/ARM-software/astc-encoder
+     */
+    void write_bits(
+        int value,
+        int bitcount,
+        int bitoffset,
+        uint8_t* ptr
+    );
+
+    /* Routine to swap bits in a byte (reflect operation, i.e. msb <--> lsb)
+     * Borrowed from astcenc: https://github.com/ARM-software/astc-encoder
+     */
+    int bitrev8(int p);
 
     /* Encode a block of pixels into the ASTC format */
     void encode_block(
@@ -89,8 +105,11 @@ namespace astc {
 
     /* Encode a block of pixels into the ASTC format using integer arithmetic */
     void encode_block_int(
-        const uint8_t block_pixels[NCH_RGB*BLOCK_X*BLOCK_Y],
-        uint32_t out[4]
+        const uint8_t* __restrict__ inp_img,
+        unsigned int block_id_x,
+        unsigned int block_id_y,
+        unsigned int img_w,
+        uint8_t* __restrict__ out_data
     );
 
 }
