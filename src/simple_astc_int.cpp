@@ -98,6 +98,11 @@ inline void _load_4u8(const uint8_t* inp, uchar4* out)
     *out = uchar4 { inp[0], inp[1], inp[2], inp[3] };
 }
 
+inline void _load_4u8(volatile const uint8_t* inp, uchar4* out)
+{
+    *out = uchar4 { inp[0], inp[1], inp[2], inp[3] };
+}
+
 inline void _min_4u8(uchar4 px, uchar4 mincol, uchar4* out)
 {
     *out = min4u8(px, mincol);
@@ -151,6 +156,35 @@ inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
 namespace simple::astc {
 
 #endif  // __TCE__
+
+// Precomputed coefficients used in horizontal bilinear interpolation
+constexpr uchar4 BILIN_WEIGHTS_X_8_U8[10] = {          //  IDX:
+    { 187,  68,   0,   0, },                           //  {  0,  1,  0, },
+    {   0, 111, 128,  16, },                           //  {  1,  2,  3, },
+    {   0,   0,  42, 142, }, {  71,   0,   0,   0, },  //  {  2,  3,  4, },
+    {  90, 135,  30,   0, },                           //  {  4,  5,  6, },
+    {   0,  30, 135,  90, },                           //  {  5,  6,  7, },
+    {   0,   0,   0,  71, }, { 142,  42,   0,   0, },  //  {  7,  8,  9, },
+    {  16, 128, 111,   0, },                           //  {  8,  9, 10, },
+    {   0,   0,  68, 187, },                           //  { 10, 11,  0, },
+};
+
+// Precomputed coefficients used in vertical bilinear interpolation
+// IDX:
+// {  0,  1,  2,  0,  0,  0, },
+// {  1,  2,  3,  4,  5,  0, },
+// {  3,  4,  5,  6,  7,  8, },
+// {  6,  7,  8,  9, 10,  0, },
+// {  9, 10, 11,  0,  0,  0, },
+constexpr uchar4 BILIN_WEIGHTS_Y_5_U8[9] = {
+    { 134,  85,  36,   0, },
+    {   0,  34,  68,  85, }, {  51,  17,   0,   0, },
+    // bumped two middle values to sum up to 254:
+    {   0,   0,   0,   8, }, {  42,  77,  77,  42, }, {   8,   0,   0,   0, },
+    {   0,   0,  17,  51, }, {  85,  68,  34,   0, },
+    {   0,  36,  85, 134, },
+};
+
 
 /** Return a pointer to uchar4 vector as a uint32_t pointer */
 inline uint32_t* as_u32(const uchar4* x)
@@ -257,6 +291,182 @@ inline void pack_rgb_u8(uint32_t a[3], uchar4* out)
     out->x = (uint8_t)(a[0]);
     out->y = (uint8_t)(a[1]);
     out->z = (uint8_t)(a[2]);
+}
+
+/** Downsample 12x12 block into 8x5 using bilinear filtering and quantize it
+ *
+ * The inp/out grid size is fixed and one channel per sample is assumed.
+ * The output is also quantized.
+ */
+inline void downsample_12x12_to_8x5_u8_quant(
+    const uint8_t inp[BLOCK_PX_CNT],
+    uint8_t out[WGT_CNT]
+){
+    constexpr unsigned int w_inp = 12;
+    constexpr unsigned int h_inp = 12;
+    constexpr unsigned int w_out = 8;
+    constexpr unsigned int h_out = 5;
+
+    // size of the bilin. kernel
+    constexpr unsigned int pixel_count_x = 3;
+    constexpr unsigned int pixel_count_y = 6;
+
+    // Buffer for holding intermediate results (columns stored as rows for easy
+    // access in the second loop).
+    // volatile uint8_t tmp[w_out*h_inp];
+    volatile uint8_t tmp[h_inp*w_out];
+
+    // First, interpolate rows.
+    for (unsigned int y = 0; y < h_inp; ++y)
+    {
+        const unsigned int base_addr_i = y*w_inp;
+
+        uchar4 inp0, inp4, inp8;
+        _load_4u8(inp + base_addr_i + 0, &inp0);
+        _load_4u8(inp + base_addr_i + 4, &inp4);
+        _load_4u8(inp + base_addr_i + 8, &inp8);
+
+        // m = 0
+        const uchar4 wgt0 = BILIN_WEIGHTS_X_8_U8[0];
+
+        uint32_t out0;
+        _saturating_dot_acc_4u8(inp0, wgt0, 0, &out0);
+
+        unsigned int addr_o = y;
+        tmp[addr_o] = (uint8_t)(out0 >> 8); // TODO: rounding
+
+        // m = 1
+        const uchar4 wgt1 = BILIN_WEIGHTS_X_8_U8[1];
+
+        uint32_t out1;
+        _saturating_dot_acc_4u8(inp0, wgt1, 0, &out1);
+
+        addr_o += h_inp;
+        tmp[addr_o] = (uint8_t)(out1 >> 8); // TODO: rounding
+
+        // m = 2
+        const uchar4 wgt2a = BILIN_WEIGHTS_X_8_U8[2];
+        const uchar4 wgt2b = BILIN_WEIGHTS_X_8_U8[3];
+
+        uint32_t out2;
+        _saturating_dot_acc_4u8(inp0, wgt2a, 0, &out2);
+        _saturating_dot_acc_4u8(inp4, wgt2b, out2, &out2);
+
+        addr_o += h_inp;
+        tmp[addr_o] = (uint8_t)(out2 >> 8); // TODO: rounding
+
+        // m = 3
+        const uchar4 wgt3 = BILIN_WEIGHTS_X_8_U8[4];
+
+        uint32_t out3;
+        _saturating_dot_acc_4u8(inp4, wgt3, 0, &out3);
+
+        addr_o += h_inp;
+        tmp[addr_o] = (uint8_t)(out3 >> 8); // TODO: rounding
+
+        // m = 4
+        const uchar4 wgt4 = BILIN_WEIGHTS_X_8_U8[5];
+
+        uint32_t out4;
+        _saturating_dot_acc_4u8(inp4, wgt4, 0, &out4);
+
+        addr_o += h_inp;
+        tmp[addr_o] = (uint8_t)(out4 >> 8); // TODO: rounding
+
+        // m = 5
+        const uchar4 wgt5a = BILIN_WEIGHTS_X_8_U8[6];
+        const uchar4 wgt5b = BILIN_WEIGHTS_X_8_U8[7];
+
+        uint32_t out5;
+        _saturating_dot_acc_4u8(inp4, wgt5a, 0, &out5);
+        _saturating_dot_acc_4u8(inp8, wgt5b, out5, &out5);
+
+        addr_o += h_inp;
+        tmp[addr_o] = (uint8_t)(out5 >> 8); // TODO: rounding
+
+        // m = 6
+        const uchar4 wgt6 = BILIN_WEIGHTS_X_8_U8[8];
+
+        uint32_t out6;
+        _saturating_dot_acc_4u8(inp8, wgt6, 0, &out6);
+
+        addr_o += h_inp;
+        tmp[addr_o] = (uint8_t)(out6 >> 8); // TODO: rounding
+
+        // m = 7
+        const uchar4 wgt7 = BILIN_WEIGHTS_X_8_U8[9];
+
+        uint32_t out7;
+        _saturating_dot_acc_4u8(inp8, wgt7, 0, &out7);
+
+        addr_o += h_inp;
+        tmp[addr_o] = (uint8_t)(out7 >> 8); // TODO: rounding
+    }
+
+    // Next, columns
+    constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
+    for (unsigned int m = 0; m < w_out; ++m)
+    {
+        const unsigned int base_addr_i = m*h_inp;
+
+        uchar4 tmp0, tmp4, tmp8;
+        _load_4u8(tmp + base_addr_i + 0, &tmp0);
+        _load_4u8(tmp + base_addr_i + 4, &tmp4);
+        _load_4u8(tmp + base_addr_i + 8, &tmp8);
+
+        // n = 0
+        const uchar4 wgt0 = BILIN_WEIGHTS_Y_5_U8[0];
+
+        uint32_t out0;
+        _saturating_dot_acc_4u8(tmp0, wgt0, 0, &out0);
+
+        unsigned int addr_o = m;
+        out[addr_o] = (uint8_t)(out0 >> SHR_QUANT); // TODO: rounding
+
+        // n = 1
+        const uchar4 wgt1a = BILIN_WEIGHTS_Y_5_U8[1];
+        const uchar4 wgt1b = BILIN_WEIGHTS_Y_5_U8[2];
+
+        uint32_t out1;
+        _saturating_dot_acc_4u8(tmp0, wgt1a, 0, &out1);
+        _saturating_dot_acc_4u8(tmp4, wgt1b, out1, &out1);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out1 >> SHR_QUANT); // TODO: rounding
+
+        // n = 2
+        const uchar4 wgt2a = BILIN_WEIGHTS_Y_5_U8[3];
+        const uchar4 wgt2b = BILIN_WEIGHTS_Y_5_U8[4];
+        const uchar4 wgt2c = BILIN_WEIGHTS_Y_5_U8[5];
+
+        uint32_t out2;
+        _saturating_dot_acc_4u8(tmp0, wgt2a, 0, &out2);
+        _saturating_dot_acc_4u8(tmp4, wgt2b, out2, &out2);
+        _saturating_dot_acc_4u8(tmp8, wgt2c, out2, &out2);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out2 >> SHR_QUANT); // TODO: rounding
+
+        // n = 3
+        const uchar4 wgt3a = BILIN_WEIGHTS_Y_5_U8[6];
+        const uchar4 wgt3b = BILIN_WEIGHTS_Y_5_U8[7];
+
+        uint32_t out3;
+        _saturating_dot_acc_4u8(tmp4, wgt3a, 0, &out3);
+        _saturating_dot_acc_4u8(tmp8, wgt3b, out3, &out3);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out3 >> SHR_QUANT); // TODO: rounding
+
+        // n = 4
+        const uchar4 wgt4 = BILIN_WEIGHTS_Y_5_U8[8];
+
+        uint32_t out4;
+        _saturating_dot_acc_4u8(tmp8, wgt4, 0, &out4);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out4 >> SHR_QUANT); // TODO: rounding
+    }
 }
 
 /** Encode a block of pixels
@@ -419,6 +629,11 @@ void encode_block_int(
 
             // printf("iwgt[%3d] : %#04x\n", i, ideal_weights[i]);
         }
+
+        downsample_12x12_to_8x5_u8_quant(
+            ideal_weights,
+            quantized_weights
+        );
     }
 }
 
