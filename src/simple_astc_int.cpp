@@ -27,6 +27,16 @@ inline void _max_4u8(uchar4 px, uchar4 maxcol, uchar4* out)
     _TCE_MAXU8X4(px, maxcol, *out);
 }
 
+inline void _min_u32(uint32_t lhs, uint32_t rhs, uint32_t* out)
+{
+    _TCE_MIN(lhs, rhs, *out);
+}
+
+inline void _max_u32(uint32_t lhs, uint32_t rhs, uint32_t* out)
+{
+    _TCE_MAX(lhs, rhs, *out);
+}
+
 inline void _saturating_sub_4u8(uchar4 lhs, uchar4 rhs, uchar4* out)
 {
     _TCE_SATSUBU8X4(lhs, rhs, *out);
@@ -44,6 +54,18 @@ inline void _saturating_dot_acc_4u8(
 inline void _shr_round_4u8(uchar4 inp, uchar4 amt, uchar4* out)
 {
     _TCE_SHRRU8X4(inp, amt, *out);
+}
+
+/* Unpack the first three elements of uchar4 vector into 32b array */
+inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
+{
+    constexpr uchar4 r_mask = { 1, 0, 0, 0 };
+    constexpr uchar4 g_mask = { 0, 1, 0, 0 };
+    constexpr uchar4 b_mask = { 0, 0, 1, 0 };
+
+    _TCE_SATACCDOTU8X4(r_mask, v, 0, out[0]);
+    _TCE_SATACCDOTU8X4(g_mask, v, 0, out[1]);
+    _TCE_SATACCDOTU8X4(b_mask, v, 0, out[2]);
 }
 
 #else  // not __TCE__
@@ -86,6 +108,11 @@ inline void _max_4u8(uchar4 px, uchar4 maxcol, uchar4* out)
     *out = max4u8(px, maxcol);
 }
 
+inline void _max_u32(uint32_t lhs, uint32_t rhs, uint32_t* out)
+{
+    *out = u32max(lhs, rhs);
+}
+
 inline void _saturating_sub_4u8(uchar4 lhs, uchar4 rhs, uchar4* out)
 {
     *out = lhs.satsub(rhs);
@@ -112,6 +139,14 @@ inline void _saturating_dot_acc_4u8(
 //     constexpr uint32_t ONE = ((1 << 30) - 1); // 1 in Q0.15
 //     return ONE / x;
 // }
+
+/* Unpack the first three elements of uchar4 vector into 32b array */
+inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
+{
+    out[0] = static_cast<uint32_t>(v.x);
+    out[1] = static_cast<uint32_t>(v.y);
+    out[2] = static_cast<uint32_t>(v.z);
+}
 
 namespace simple::astc {
 
@@ -216,6 +251,14 @@ inline uint32_t approx_inv_u32(uint32_t x)
     return (y1 << shl) >> shr;
 }
 
+/* Pack the first three elements of input 32b array into uchar4 vector */
+inline void pack_rgb_u8(uint32_t a[3], uchar4* out)
+{
+    out->x = (uint8_t)(a[0]);
+    out->y = (uint8_t)(a[1]);
+    out->z = (uint8_t)(a[2]);
+}
+
 /** Encode a block of pixels
  *
  * The block_id_x/y could be substituted with get_global_id() if converted to
@@ -316,8 +359,51 @@ void encode_block_int(
         // Q10.22, max. value 1024 for 5b quant
         const uint32_t inv_ep_dot = approx_inv_u32(ep_dot);
 
-        printf("ep_dot: %#010x\n", ep_dot);
-        printf("inv   : %#010x\n", inv_ep_dot);
+        // printf("ep_dot: %#010x\n", ep_dot);
+        // printf("inv   : %#010x\n", inv_ep_dot);
+
+        // The scaled ep_vec can be max. 32 due to 5b quantization
+        uint32_t ep_vec32[3];
+        _unpack_rgb_u32(ep_vec, ep_vec32);
+
+        uint32_t ep_sc32[3] = {
+            ep_vec32[0] * (inv_ep_dot >> 8),  // Q0.8 * Q10.14 = Q10.22
+            ep_vec32[1] * (inv_ep_dot >> 8),
+            ep_vec32[2] * (inv_ep_dot >> 8),
+        };
+
+        // Scaling the endpoint vector to fit 8 bits. The Q representation
+        // depends on the magnitude of the division result above: between Q5.3
+        // and Q0.8.
+        const uint32_t log2ep[3] = {
+            log2(ep_sc32[0]),
+            log2(ep_sc32[1]),
+            log2(ep_sc32[2]),
+        };
+
+        uint32_t sc;
+        _max_u32(log2ep[0], log2ep[1], &sc);
+        _max_u32(log2ep[2], sc, &sc);
+        const uint32_t q_int = sc >= 21 ? sc - 21 : 0; // no. integer bits
+        const uint32_t shr = 14 + q_int;               // how much to rshift
+
+        ep_sc32[0] >>= shr;
+        ep_sc32[1] >>= shr;
+        ep_sc32[2] >>= shr;
+
+        uchar4 ep_sc8;
+        pack_rgb_u8(ep_sc32, &ep_sc8);
+
+        // One (almost), represented in the variable Q format.
+        const uint32_t shr_res = 8 - q_int;
+        const uint32_t one = (1 << shr_res) - 1;
+
+        // printf("ep_sc32[0]: %#010x\n", ep_sc32[0]);
+        // printf("ep_sc32[1]: %#010x\n", ep_sc32[1]);
+        // printf("ep_sc32[2]: %#010x\n", ep_sc32[2]);
+        // printf("ep_sc8    : %#010x\n", *as_u32(&ep_sc8));
+        // printf("one       : %#010x\n", one);
+        // print_minmax_u8("          :", mincol, maxcol);
     }
 }
 

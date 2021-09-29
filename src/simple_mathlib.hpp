@@ -480,6 +480,17 @@ inline uint8_t u8max(uint8_t a, uint8_t b)
     }
 }
 
+inline uint32_t u32max(uint32_t a, uint32_t b)
+{
+    if (a > b)
+    {
+        return a;
+    } else
+    {
+        return b;
+    }
+}
+
 inline Vec3u8 min3u8(Vec3u8 a, Vec3u8 b)
 {
     return Vec3u8 {
