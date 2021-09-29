@@ -5,6 +5,10 @@ constexpr unsigned int WGT_X = 8;
 constexpr unsigned int WGT_Y = 5;
 constexpr unsigned int WGT_CNT = WGT_X * WGT_Y;
 
+// Encoded block size
+constexpr unsigned int BLOCK_SIZE_EXP = 4;
+constexpr unsigned int BLOCK_SIZE = (1 << BLOCK_SIZE_EXP);
+
 #ifdef __TCE__
 
 // Size of the pixel blocks the image will be split into
@@ -15,6 +19,16 @@ constexpr unsigned int BLOCK_PX_CNT = BLOCK_X * BLOCK_Y;
 inline void _load_4u8(volatile const uint8_t* inp, uchar4* out)
 {
     _TCE_LD32(inp, *out);
+}
+
+inline void _load_u32(uint8_t* inp, uint32_t* out)
+{
+    _TCE_LD32(inp, *out);
+}
+
+inline void _store_u32(uint8_t* out, uint32_t val)
+{
+    _TCE_ST32(out, val);
 }
 
 inline void _min_4u8(uchar4 px, uchar4 mincol, uchar4* out)
@@ -68,6 +82,52 @@ inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
     _TCE_SATACCDOTU8X4(b_mask, v, 0, out[2]);
 }
 
+/* Unpack the first three elements of uchar4 vector into 8b array */
+inline void _unpack_rgb_u8(uchar4 v, uint8_t out[3])
+{
+    constexpr uchar4 r_mask = { 1, 0, 0, 0 };
+    constexpr uchar4 g_mask = { 0, 1, 0, 0 };
+    constexpr uchar4 b_mask = { 0, 0, 1, 0 };
+
+    _TCE_SATACCDOTU8X4(r_mask, v, 0, out[0]);
+    _TCE_SATACCDOTU8X4(g_mask, v, 0, out[1]);
+    _TCE_SATACCDOTU8X4(b_mask, v, 0, out[2]);
+}
+
+inline void _reflect_u32(uint32_t inp, uint32_t* out)
+{
+    _TCE_REFLECT(wgt4, *reflected);
+}
+
+// Taken from astcenc:
+// routine to write up to 8 bits
+inline void _write_bits(
+	int value,
+	int bitcount,
+	int bitoffset,
+	volatile uint8_t* ptr
+) {
+	int mask = (1 << bitcount) - 1;
+	value &= mask;
+	// ptr += bitoffset >> 3;
+    uint32_t off = (bitoffset >> 3);
+	bitoffset &= 7;
+	value <<= bitoffset;
+	mask <<= bitoffset;
+	mask = ~mask;
+
+    uint8_t a = (ptr[off] & mask) | value;
+    uint8_t b = (ptr[off+1] & (mask >> 8)) | (value >> 8);
+
+	// ptr[0] &= mask;
+	// ptr[0] |= value;
+	// ptr[1] &= mask >> 8;
+	// ptr[1] |= value >> 8;
+
+    _TCE_ST8(ptr + off, a);
+    _TCE_ST8(ptr + off + 1, b);
+}
+
 #else  // not __TCE__
 
 #include "simple_mathlib.hpp"
@@ -101,6 +161,16 @@ inline void _load_4u8(const uint8_t* inp, uchar4* out)
 inline void _load_4u8(volatile const uint8_t* inp, uchar4* out)
 {
     *out = uchar4 { inp[0], inp[1], inp[2], inp[3] };
+}
+
+inline void _load_u32(uint8_t* inp, uint32_t* out)
+{
+    *out = *reinterpret_cast<uint32_t*>(inp);
+}
+
+inline void _store_u32(uint8_t* out, uint32_t val)
+{
+    *out = val;
 }
 
 inline void _min_4u8(uchar4 px, uchar4 mincol, uchar4* out)
@@ -151,6 +221,33 @@ inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
     out[0] = static_cast<uint32_t>(v.x);
     out[1] = static_cast<uint32_t>(v.y);
     out[2] = static_cast<uint32_t>(v.z);
+}
+
+/* Unpack the first three elements of uchar4 vector into 32b array */
+inline void _unpack_rgb_u8(uchar4 v, uint8_t out[3])
+{
+    out[0] = v.x;
+    out[1] = v.y;
+    out[2] = v.z;
+}
+
+inline void _reflect_u32(uint32_t inp, uint32_t* out)
+{
+    uchar4 i = *reinterpret_cast<uchar4*>(inp);
+
+    i.x = astc::bitrev8(i.x);
+    i.y = astc::bitrev8(i.y);
+    i.z = astc::bitrev8(i.z);
+    i.w = astc::bitrev8(i.w);
+
+    i = uchar4 { i.w, i.z, i.y, i.x };
+
+    *out = *reinterpret_cast<uint32_t*>(&i);
+}
+
+inline void _write_bits(int value, int bitcount, int bitoffset, uint8_t* ptr)
+{
+    astc::write_bits(value, bitcount, bitoffset, ptr);
 }
 
 namespace simple::astc {
@@ -484,7 +581,7 @@ void encode_block_int(
     volatile uint8_t* __restrict__ out_data
 ){
 
-#else  // __TCE__
+#else  // not __TCE__
 
 void encode_block_int(
     const uint8_t* __restrict__ inp_img,
@@ -493,6 +590,9 @@ void encode_block_int(
     unsigned int img_w,
     uint8_t* __restrict__ out_data
 ){
+
+    // Number of blocks in x-direction
+    const unsigned int NB_X = img_w / BLOCK_X;
 
 #endif  // __TCE__
 
@@ -634,6 +734,76 @@ void encode_block_int(
             ideal_weights,
             quantized_weights
         );
+    }
+
+    // Output buffers for quantized weights and output data
+	uint8_t wgt_buf[BLOCK_SIZE] = { 0 };
+
+    // weights ISE encoding
+    constexpr uint8_t wgt_bits = 2;
+    constexpr uint8_t wgt_byte_cnt = 10; // 40 * 2 / 8
+    unsigned int j = 0;
+    for (unsigned int i = 0; i < WGT_CNT; i += 4)
+    {
+        uint32_t wgt;
+        _load_u32(quantized_weights + i , &wgt);
+
+        uint8_t res = wgt & 0x03;
+        res |= (wgt >> 6) & 0x0c;
+        res |= (wgt >> 12) & 0x30;
+        res |= (wgt >> 18) & 0xc0;
+
+        //debug
+        //_TCE_ST8(TEST+j, res);
+
+        wgt_buf[j++] = res;
+    }
+
+    // Calculate output data address (16 bytes per block)
+    out_data = out_data + ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP);
+    // printf("-- out off: %d\n", ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP));
+
+    // write out weights
+    for (unsigned int i = 0; i < BLOCK_SIZE; i += 4)
+    {
+        uint32_t wgt4 = *(uint32_t*)(wgt_buf + 12 - i);
+        uint32_t reflected;
+        _reflect_u32(wgt4, &reflected);
+        _store_u32(out_data + i, reflected);
+    }
+
+    // write out mode, partition, CEM
+    constexpr uint16_t block_mode = 102;
+    write_bits(block_mode, 11, 0, out_data);
+    constexpr unsigned int partition_count = 1;
+    write_bits(partition_count - 1, 2, 11, out_data);
+    constexpr unsigned int color_format = 8;
+    write_bits(color_format, 4, 13, out_data);
+
+    // quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
+    uint8_t mincol_quant_unpacked[3];
+    uint8_t maxcol_quant_unpacked[3];
+
+    _unpack_rgb_u8(mincol_quant, (uint8_t*)(mincol_quant_unpacked));
+    _unpack_rgb_u8(maxcol_quant, (uint8_t*)(maxcol_quant_unpacked));
+
+    uint8_t endpoints_q[6] = {
+        (uint8_t)(mincol_quant_unpacked[0]),
+        (uint8_t)(maxcol_quant_unpacked[0]),
+        (uint8_t)(mincol_quant_unpacked[1]),
+        (uint8_t)(maxcol_quant_unpacked[1]),
+        (uint8_t)(mincol_quant_unpacked[2]),
+        (uint8_t)(maxcol_quant_unpacked[2]),
+    };
+
+    // write out endpoints
+    unsigned int off = 17;  // starting bit position for endpoints data
+    constexpr uint8_t ep_bits = 5;
+    off = 17;  // starting bit position for endpoints data
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        write_bits(endpoints_q[i], ep_bits, off, out_data);
+        off += ep_bits;
     }
 }
 
