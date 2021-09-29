@@ -5,10 +5,80 @@
 
 using namespace simple;
 
+/* Copy-pasted from simple_astc_int.cpp */
+inline uint32_t log2(uint32_t x)
+{
+    uint32_t res = (x > 0xffff) << 4;
+    x >>= res;
+
+    uint32_t shift = (x > 0xff) << 3;
+    x >>= shift;
+    res |= shift;
+
+    shift = (x > 0xf ) << 2;
+    x >>= shift;
+    res |= shift;
+
+    shift = (x > 0x3 ) << 1;
+    x >>= shift;
+    res |= shift;
+
+    res |= (x >> 1);
+
+    return res;
+}
+
+/* Copy-pasted from simple_astc_int.cpp */
+inline uint32_t approx_inv_u32(uint32_t x)
+{
+    // Useful constants
+    constexpr unsigned int A = 0x0000F0F1;            // 32.0 / 17.0  Q2.15
+    constexpr unsigned int B = 0xB4B4B4B5;            // 48.0 / 17.0  Q2.30
+    constexpr unsigned int ONE_Q15 = ((1 << 15) - 1); // 1 in Q0.15
+
+    // First, scale the input to be within [0.5, 1.0]
+    const int32_t scale = 15 - (int32_t)log2(x);
+
+    const uint32_t shl = (scale < 0) ?      0 : scale;
+    const uint32_t shr = (scale < 0) ? -scale :     0;
+     // x_sc is 0.5--1.0, so Q0.16 -> Q0.15
+    const uint32_t x_sc = (x << shl) >> (shr+1);
+
+    // Then, compute the initial estimate
+    // Q4.30 but x_sc is <= 1 so the two MSB are unused => Q2.30
+    const uint32_t A_x_sc = A * x_sc;
+    // Q2.30 - Q2.30 = Q3.30 -> Q2.30 (won't overflow)
+    const uint32_t init = B - A_x_sc;
+
+    // Newthon-Raphson iterations
+    // 1st
+    uint32_t y0 = init >> 15;             // Q2.15
+    uint32_t y00 = init;                  // Q2.30
+    uint32_t tmp = (x_sc * y0) >> 15;     // Q0.15 * Q2.15 = Q2.30 -> Q2.15
+    // Q2.30 + (Q2.15 * (Q0.15 - Q2.15))
+    uint32_t y1 = y00 + y0 * (ONE_Q15 - tmp);
+
+    // 2nd
+    y0 = y1 >> 15;
+    y00 = y1;
+    tmp = (x_sc * y0) >> 15;
+    y1 = y00 + y0 * (ONE_Q15 - tmp);
+
+    // 3rd
+    y0 = y1 >> 15;
+    y00 = y1;// >> 1;
+    tmp = (x_sc * y0) >> 15;
+    y1 = y00 + y0 * (ONE_Q15 - tmp);
+
+    // The result is scaled down now, we need to scale it back
+    y1 >>= 8; // Q10.22
+    return (y1 << shl) >> shr;
+}
+
 #ifndef NDEBUG
 
 /* Same as mathlib version but with debug prints */
-uint32_t approx_inv32_debug(uint32_t x)
+uint32_t approx_inv_u32_debug(uint32_t x)
 {
     // First, scale the input to be within [0.5, 1.0]
     int scale = (int)(log2(x));
@@ -79,7 +149,7 @@ void compute_inv(uint32_t x, double xf)
     printf("%10.8f  ", xf);
     print_bin_(x, 18, 16);
 
-    uint32_t inv_x = approx_inv32_debug(x);
+    uint32_t inv_x = approx_inv_u32_debug(x);
     double gt = 1.0 / xf;
 
     double inv_x_fi = fixed_to_double(inv_x, 22);
@@ -89,7 +159,7 @@ void compute_inv(uint32_t x, double xf)
 
 #else // not NDEBUG
 
-uint32_t approx_inv32_debug(uint32_t x)
+uint32_t approx_inv_u32_debug(uint32_t x)
 {
     printf("Build and run in debug mode\n");
     return 0;

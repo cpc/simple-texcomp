@@ -382,6 +382,22 @@ struct Vec4u8
         };
     }
 
+    inline uint32_t sataccdot(const Vec4u8 &other, uint32_t acc) const
+    {
+        uint32_t res = (
+            x * other.x +
+            y * other.y +
+            z * other.z +
+            w * other.w +
+            acc
+        );
+
+        if (res < acc) {
+            res = UINT32_MAX;
+        }
+
+        return res;
+    }
 };
 
 struct Vec3u16
@@ -736,75 +752,6 @@ inline void print_fixed8(const char *pre, unsigned int x, unsigned int frac)
 }
 
 #endif // not NDEBUG
-
-/* Compute log2 (i.e., the position of the highest bit set) */
-inline uint32_t log2(uint32_t x)
-{
-    uint32_t res = (x > 0xffff) << 4;
-    x >>= res;
-
-    uint32_t shift = (x > 0xff) << 3;
-    x >>= shift;
-    res |= shift;
-
-    shift = (x > 0xf ) << 2;
-    x >>= shift;
-    res |= shift;
-
-    shift = (x > 0x3 ) << 1;
-    x >>= shift;
-    res |= shift;
-
-    res |= (x >> 1);
-
-    return res;
-}
-
- /* Approximate 1/x in a fixed point arithmetic.
-  *
-  * Assumes x is in a Q2.16 format (unsigned). Returns Q10.22.
-  */
-inline uint32_t approx_inv32(uint32_t x)
-{
-    // First, scale the input to be within [0.5, 1.0]
-    const int32_t scale = 15 - (int32_t)log2(x);
-
-    const uint32_t shl = (scale < 0) ?      0 : scale;
-    const uint32_t shr = (scale < 0) ? -scale :     0;
-    const uint32_t x_sc = (x << shl) >> (shr+1); // x_sc is 0.5--1.0, so Q0.16 -> Q0.15
-
-    // Then, compute the initial estimate
-    constexpr uint32_t A = 0x0000F0F1; // 32.0 / 17.0  Q2.15
-    constexpr uint32_t B = 0xB4B4B4B5; // 48.0 / 17.0  Q2.30
-
-    const uint32_t A_x_sc = A * x_sc;  // Q4.30 but x_sc is <= 1 so the two MSB are unused => Q2.30
-    const uint32_t init = B - A_x_sc;  // Q2.30 - Q2.30 = Q3.30 -> Q2.30 (won't overflow)
-
-    constexpr uint32_t ONE = (1 << 15) - 1;  // 1 in Q0.15
-
-    // Newthon-Raphson iterations
-    // 1st
-    uint32_t y0 = init >> 15;             // Q2.15
-    uint32_t y00 = init;                  // Q2.30
-    uint32_t tmp = (x_sc * y0) >> 15;     // Q0.15 * Q2.15 = Q2.30 -> Q2.15
-    uint32_t y1 = y00 + y0 * (ONE - tmp); // Q2.30 + (Q2.15 * (Q0.15 - Q2.15))
-
-    // 2nd
-    y0 = y1 >> 15;
-    y00 = y1;
-    tmp = (x_sc * y0) >> 15;
-    y1 = y00 + y0 * (ONE - tmp);
-
-    // 3rd
-    y0 = y1 >> 15;
-    y00 = y1;// >> 1;
-    tmp = (x_sc * y0) >> 15;
-    y1 = y00 + y0 * (ONE - tmp);
-
-    // The result is scaled down now, we need to scale it back
-    y1 >>= 8; // Q10.22
-    return (y1 << shl) >> shr;
-}
 
 }  // namespace simple
 
