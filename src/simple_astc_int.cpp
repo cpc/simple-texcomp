@@ -347,10 +347,6 @@ void encode_block_int(
 
     if (*as_u32(&mincol_quant) != *as_u32(&maxcol_quant))
     {
-        // Pixels mapped to the endpoint line without quantization and
-        // downsampling
-        uint8_t ideal_weights[BLOCK_PX_CNT];
-
         // Projection of pixels onto ep_vec to get the ideal weights
         // First, we normalize the endpoint vector and scale it.
         uint32_t ep_dot;     // Q2.16
@@ -404,6 +400,25 @@ void encode_block_int(
         // printf("ep_sc8    : %#010x\n", *as_u32(&ep_sc8));
         // printf("one       : %#010x\n", one);
         // print_minmax_u8("          :", mincol, maxcol);
+
+        // Pixels mapped to the endpoint line without quantization and
+        // downsampling
+        uint8_t ideal_weights[BLOCK_PX_CNT];
+
+        for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
+        {
+            uchar4 diff;
+            _saturating_sub_4u8(block_pixels[i], mincol, &diff);
+
+            // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
+            // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
+            // recover lost precision by adding one
+            uint32_t res;
+            _saturating_dot_acc_4u8(diff, ep_sc8, one, &res);
+            ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
+
+            // printf("iwgt[%3d] : %#04x\n", i, ideal_weights[i]);
+        }
     }
 }
 
