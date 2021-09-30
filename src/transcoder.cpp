@@ -183,13 +183,12 @@ int encode_image(
                 encode_block(block_pixels, enc_data.data() + offset);
             } else {
                 // Encode the block
-                const int offset = (nblocks_x * block_y + block_x) * block_nints;
                 astc::encode_block_int(
                     inp_pixels,
                     block_x,
                     block_y,
                     img_w,
-                    (uint8_t*)enc_data.data()
+                    (uint8_t*)(enc_data.data())
                 );
             }
         }

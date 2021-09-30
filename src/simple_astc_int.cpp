@@ -5,7 +5,7 @@ constexpr unsigned int WGT_X = 8;
 constexpr unsigned int WGT_Y = 5;
 constexpr unsigned int WGT_CNT = WGT_X * WGT_Y;
 
-// Encoded block size
+// Encoded block size (in bytes)
 constexpr unsigned int BLOCK_SIZE_EXP = 4;
 constexpr unsigned int BLOCK_SIZE = (1 << BLOCK_SIZE_EXP);
 
@@ -170,7 +170,11 @@ inline void _load_u32(uint8_t* inp, uint32_t* out)
 
 inline void _store_u32(uint8_t* out, uint32_t val)
 {
-    *out = val;
+    // *out = val;
+    out[0] = (uint8_t)(val & 0xff);
+    out[1] = (uint8_t)((val >> 8) & 0xff);
+    out[2] = (uint8_t)((val >> 16) & 0xff);
+    out[3] = (uint8_t)((val >> 24) & 0xff);
 }
 
 inline void _min_4u8(uchar4 px, uchar4 mincol, uchar4* out)
@@ -233,16 +237,14 @@ inline void _unpack_rgb_u8(uchar4 v, uint8_t out[3])
 
 inline void _reflect_u32(uint32_t inp, uint32_t* out)
 {
-    uchar4 i = *reinterpret_cast<uchar4*>(inp);
+    const uint8_t rev_bytes[4] = {
+        (uint8_t)(astc::bitrev8((uint8_t)((inp >> 24) & 0xff))),
+        (uint8_t)(astc::bitrev8((uint8_t)((inp >> 16) & 0xff))),
+        (uint8_t)(astc::bitrev8((uint8_t)((inp >> 8) & 0xff))),
+        (uint8_t)(astc::bitrev8((uint8_t)((inp >> 0) & 0xff))),
+    };
 
-    i.x = astc::bitrev8(i.x);
-    i.y = astc::bitrev8(i.y);
-    i.z = astc::bitrev8(i.z);
-    i.w = astc::bitrev8(i.w);
-
-    i = uchar4 { i.w, i.z, i.y, i.x };
-
-    *out = *reinterpret_cast<uint32_t*>(&i);
+    *out = *reinterpret_cast<const uint32_t*>(rev_bytes);
 }
 
 inline void _write_bits(int value, int bitcount, int bitoffset, uint8_t* ptr)
@@ -761,15 +763,14 @@ void encode_block_int(
 
     // Calculate output data address (16 bytes per block)
     out_data = out_data + ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP);
-    // printf("-- out off: %d\n", ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP));
 
     // write out weights
     for (unsigned int i = 0; i < BLOCK_SIZE; i += 4)
     {
-        uint32_t wgt4 = *(uint32_t*)(wgt_buf + 12 - i);
+        uint32_t wgt4 = *(uint32_t*)(&wgt_buf[12 - i]);
         uint32_t reflected;
         _reflect_u32(wgt4, &reflected);
-        _store_u32(out_data + i, reflected);
+        _store_u32(&out_data[i], reflected);
     }
 
     // write out mode, partition, CEM
