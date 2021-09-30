@@ -1,20 +1,17 @@
 #include <stdint.h>
 
-// Size of the weight grid the input block will be downsampled to
-constexpr unsigned int WGT_X = 8;
-constexpr unsigned int WGT_Y = 5;
-constexpr unsigned int WGT_CNT = WGT_X * WGT_Y;
-
-// Encoded block size (in bytes)
-constexpr unsigned int BLOCK_SIZE_EXP = 4;
-constexpr unsigned int BLOCK_SIZE = (1 << BLOCK_SIZE_EXP);
-
 #ifdef __TCE__
 
+#include <tceops.h>
+#include <tce_vector.h>
+
+/* Defines compile-time constants in the Aamu repo */
+#include "constants.hpp"
+
 // Size of the pixel blocks the image will be split into
-constexpr unsigned int BLOCK_X = 12;
-constexpr unsigned int BLOCK_Y = 12;
-constexpr unsigned int BLOCK_PX_CNT = BLOCK_X * BLOCK_Y;
+// constexpr unsigned int BLOCK_X = 12;
+// constexpr unsigned int BLOCK_Y = 12;
+// constexpr unsigned int BLOCK_PX_CNT = BLOCK_X * BLOCK_Y;
 
 inline void _load_4u8(volatile const uint8_t* inp, uchar4* out)
 {
@@ -26,7 +23,7 @@ inline void _load_u32(uint8_t* inp, uint32_t* out)
     _TCE_LD32(inp, *out);
 }
 
-inline void _store_u32(uint8_t* out, uint32_t val)
+inline void _store_u32(volatile uint8_t* out, uint32_t val)
 {
     _TCE_ST32(out, val);
 }
@@ -96,7 +93,7 @@ inline void _unpack_rgb_u8(uchar4 v, uint8_t out[3])
 
 inline void _reflect_u32(uint32_t inp, uint32_t* out)
 {
-    _TCE_REFLECT(wgt4, *reflected);
+    _TCE_REFLECT(inp, *out);
 }
 
 // Taken from astcenc:
@@ -138,6 +135,15 @@ using namespace simple;
 typedef Vec4u8 uchar4;
 
 constexpr unsigned int BLOCK_PX_CNT = astc::BLOCK_X * astc::BLOCK_Y;
+
+// Size of the weight grid the input block will be downsampled to
+constexpr unsigned int WGT_X = 8;
+constexpr unsigned int WGT_Y = 5;
+constexpr unsigned int WGT_CNT = WGT_X * WGT_Y;
+
+// Encoded block size (in bytes)
+constexpr unsigned int BLOCK_SIZE_EXP = 4;
+constexpr unsigned int BLOCK_SIZE = (1 << BLOCK_SIZE_EXP);
 
 #ifndef NDEBUG
 
@@ -775,11 +781,11 @@ void encode_block_int(
 
     // write out mode, partition, CEM
     constexpr uint16_t block_mode = 102;
-    write_bits(block_mode, 11, 0, out_data);
+    _write_bits(block_mode, 11, 0, out_data);
     constexpr unsigned int partition_count = 1;
-    write_bits(partition_count - 1, 2, 11, out_data);
+    _write_bits(partition_count - 1, 2, 11, out_data);
     constexpr unsigned int color_format = 8;
-    write_bits(color_format, 4, 13, out_data);
+    _write_bits(color_format, 4, 13, out_data);
 
     // quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
     uint8_t mincol_quant_unpacked[3];
@@ -803,7 +809,7 @@ void encode_block_int(
     off = 17;  // starting bit position for endpoints data
     for (unsigned int i = 0; i < 6; ++i)
     {
-        write_bits(endpoints_q[i], ep_bits, off, out_data);
+        _write_bits(endpoints_q[i], ep_bits, off, out_data);
         off += ep_bits;
     }
 }
