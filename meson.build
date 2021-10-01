@@ -92,6 +92,8 @@ if format == 'bc1'
   add_project_arguments('-DENC_FORMAT_DEF=BC1', language: 'cpp')
 elif format == 'ycocg_bc3'
   add_project_arguments('-DENC_FORMAT_DEF=YCOCG_BC3', language: 'cpp')
+elif format == 'ycocg'
+  add_project_arguments('-DENC_FORMAT_DEF=YCOCG', language: 'cpp')
 elif format == 'astc_int'
   add_project_arguments('-DENC_FORMAT_DEF=ASTC_INT', language: 'cpp')
 else
@@ -118,6 +120,7 @@ src_transcoder = [
   'src/simple_astc_common.cpp',
   'src/simple_bc1.cpp',
   'src/simple_ycocg_bc3.cpp',
+  'src/simple_ycocg.cpp',
   'extern/tracy/TracyClient.cpp',
 ]
 

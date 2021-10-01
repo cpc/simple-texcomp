@@ -137,6 +137,10 @@ int encode_image(
         block_nints = 4; // 128 bits per 4x4 block
         encode_block = ycocg_bc3::encode_block;
         break;
+    case YCOCG:
+        block_nints = 16; // 4 bytes per pixel
+        encode_block = ycocg::encode_block;
+        break;
     case ASTC:
         block_nints = 4; // 128 bits per block
         encode_block = astc::encode_block;
@@ -226,11 +230,15 @@ int decode_image(
         block_nints = 4; // 128 bits per 4x4 block
         decode_block = ycocg_bc3::decode_block;
         break;
+    case YCOCG:
+        block_nints = 16; // 4 bytes per pixel
+        decode_block = ycocg::decode_block;
+        break;
     case ASTC:
     case ASTC_INT:
         return 0;
     default:
-        LOGE("Unsupported encoding format\n");
+        LOGE("Unsupported decoding format\n");
         return 1;
     };
 

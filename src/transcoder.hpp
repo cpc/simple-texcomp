@@ -10,6 +10,7 @@ namespace simple {
 typedef enum enc_format_t {
     BC1,
     YCOCG_BC3,
+    YCOCG,
     ASTC,
     ASTC_INT,
 } enc_format_t;

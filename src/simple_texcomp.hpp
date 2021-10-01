@@ -162,6 +162,26 @@ namespace ycocg_bc3 {
 }
 
 /******************************************************************************
+ * YCoCg
+ *****************************************************************************/
+
+namespace ycocg {
+
+    /* Encode a block of 4x4 pixels into the YCoCg format (R-Y, G-Co, B-Cg) */
+    void encode_block(
+        const uint8_t block_pixels[NCH_RGB * 16],
+        uint32_t out[16]  // 1 byte per channel
+    );
+
+    /* Decode an encoded block into an array of 16 pixels */
+    void decode_block(
+        const uint32_t enc_block[16],
+        uint8_t out_pixels[NCH_RGB*16]
+    );
+
+}
+
+/******************************************************************************
  * Bilinear interpolation
  *****************************************************************************/
 
