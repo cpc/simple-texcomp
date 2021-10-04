@@ -385,16 +385,16 @@ inline uint32_t approx_inv_u32(uint32_t x)
     uint32_t y1 = y00 + y0 * (ONE_Q15 - tmp);
 
     // 2nd
-    y0 = y1 >> 15;
-    y00 = y1;
-    tmp = (x_sc * y0) >> 15;
-    y1 = y00 + y0 * (ONE_Q15 - tmp);
+    // y0 = y1 >> 15;
+    // y00 = y1;
+    // tmp = (x_sc * y0) >> 15;
+    // y1 = y00 + y0 * (ONE_Q15 - tmp);
 
     // 3rd
-    y0 = y1 >> 15;
-    y00 = y1;// >> 1;
-    tmp = (x_sc * y0) >> 15;
-    y1 = y00 + y0 * (ONE_Q15 - tmp);
+    // y0 = y1 >> 15;
+    // y00 = y1;// >> 1;
+    // tmp = (x_sc * y0) >> 15;
+    // y1 = y00 + y0 * (ONE_Q15 - tmp);
 
     // The result is scaled down now, we need to scale it back
     y1 >>= 8; // Q10.22
