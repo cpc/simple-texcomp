@@ -656,7 +656,7 @@ void encode_block_int(
     _saturating_sub_4u8(maxcol, mincol, &ep_vec);
 
     // Inset min/max (shrink the bounding box to reduce the effect of outliers)
-    const uchar4 inset = ep_vec >> 4;
+    const uchar4 inset = ep_vec >> 5;
     mincol = mincol + inset;
     maxcol = maxcol - inset;
 
