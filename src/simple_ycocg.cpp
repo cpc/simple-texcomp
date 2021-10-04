@@ -59,14 +59,20 @@ void decode_block(
 ){
     for (int i = 0; i < 16; ++i)
     {
-        int y  = (int)(enc_block[i] & 0xff);
-        int co = (int)((int8_t)( (enc_block[i] >>  8) & 0xff )) << 1;
-        int cg = (int)((int8_t)( (enc_block[i] >> 16) & 0xff )) << 1;
+        // YCoCg-R -> RGB
+        // int y  = (int)(enc_block[i] & 0xff);
+        // int co = (int)((int8_t)( (enc_block[i] >>  8) & 0xff )) << 1;
+        // int cg = (int)((int8_t)( (enc_block[i] >> 16) & 0xff )) << 1;
 
-        int tmp = y - (cg >> 1);
-        int g   = iclamp(cg + tmp, 0, 255);
-        int b   = iclamp(tmp - (co >> 1), 0, 255);
-        int r   = iclamp(b + co, 0, 255);
+        // int tmp = y - (cg >> 1);
+        // int g   = iclamp(cg + tmp, 0, 255);
+        // int b   = iclamp(tmp - (co >> 1), 0, 255);
+        // int r   = iclamp(b + co, 0, 255);
+
+        // Store Y->R, Co->G, Cg->B  ---  no inverse transform
+        uint8_t r = enc_block[i] & 0xff;
+        uint8_t g = (enc_block[i] >> 8) & 0xff;
+        uint8_t b = (enc_block[i] >> 16) & 0xff;
 
         out_pixels[NCH_RGB*i]   = (uint8_t)(r);
         out_pixels[NCH_RGB*i+1] = (uint8_t)(g);
