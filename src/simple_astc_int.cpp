@@ -401,6 +401,72 @@ inline uint32_t approx_inv_u32(uint32_t x)
     return (y1 << shl) >> shr;
 }
 
+#if ASTC_SELECT_DIAG == 1
+
+/* Optional selection of either current or oposite diagonal - small potential
+ * quality improvement at a small runtime cost
+ */
+// void select_diagonal(
+//     const uchar4 block[BLOCK_PX_CNT],
+//     uchar4 *mincol,
+//     uchar4 *maxcol
+// ){
+//     constexpr uchar4 ones = uchar4 { 1, 1, 1, 1 };
+
+//     uchar4 mincol2, maxcol2;
+//     _shr_round_4u8(*mincol, ones, &mincol2);
+//     _shr_round_4u8(*maxcol, ones, &maxcol2);
+
+//     uchar4 center = mincol2 + maxcol2;
+
+//     // Vec2f cov = { F(0.0), F(0.0) };
+//     uint32_t covx = 0;
+//     uint32_t covy = 0;
+//     for (int i = 0; i < BLOCK_PX_CNT; ++i) {
+//         uchar4 px;
+//         _shr_round_4u8(block[i], ones, &px);
+//         px = px + 128;  // move 0 to 128
+//         uchar4 t = px - center;
+
+//         _saturating_dot_acc_4u8(t, uchar4 { 1, 0, 1, 0 }, covx, &covx); // Q3.8
+//         _shr_round_u32(covx, 3, &covx);
+
+//         _saturating_dot_acc_4u8(t, uchar4 { 0, 1, 1, 0 }, covy, &covy);
+//         _shr_round_u32(covy, 3, &covy);
+
+//         // Vec3f t = block[i] - center;
+//         // cov.x += t.x * t.z;
+//         // cov.y += t.y * t.z;
+//     }
+
+//     // printf("     cov_x: %8.5f\n", (double)cov.x);
+//     // printf("     cov_y: %8.5f\n", (double)cov.y);
+
+//     if (cov.x < F(0.0)) {
+//         decimal tmp = maxcol->x;
+//         maxcol->x = mincol->x;
+//         mincol->x = tmp;
+//         swapped = true;
+//     }
+
+//     if (cov.y < F(0.0)) {
+//         decimal tmp = maxcol->y;
+//         maxcol->y = mincol->y;
+//         mincol->y = tmp;
+//         swapped = true;
+//     }
+// }
+
+#else
+
+// void select_diagonal(
+//     const uchar4 block[BLOCK_PX_CNT],
+//     uchar4 *mincol,
+//     uchar4 *maxcol
+// );
+
+#endif  // ASTC_SELECT_DIAG == 1
+
 /* Pack the first three elements of input 32b array into uchar4 vector */
 inline void pack_rgb_u8(uint32_t a[3], uchar4* out)
 {
