@@ -67,6 +67,11 @@ inline void _shr_round_4u8(uchar4 inp, uchar4 amt, uchar4* out)
     _TCE_SHRRU8X4(inp, amt, *out);
 }
 
+inline void _shr_round_u32(uint32_t inp, uint8_t amt, uint32_t* out)
+{
+    _TCE_SHRRU(inp, amt, *out);
+}
+
 /* Unpack the first three elements of uchar4 vector into 32b array */
 inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
 {
@@ -207,6 +212,12 @@ inline void _shr_round_4u8(uchar4 inp, uchar4 amt, uchar4* out)
 {
     // Assuming constant amt vector
     *out = shr_round_4u8(inp, amt.x);
+}
+
+inline void _shr_round_u32(uint32_t inp, uint8_t amt, uint32_t* out)
+{
+    // Assuming constant amt vector
+    *out = shr_round_u32(inp, amt);
 }
 
 inline void _saturating_dot_acc_4u8(
@@ -438,7 +449,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp0, wgt0, 0, &out0);
 
         unsigned int addr_o = y;
-        tmp[addr_o] = (uint8_t)(out0 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out0 >> 8);
 
         // m = 1
         const uchar4 wgt1 = BILIN_WEIGHTS_X_8_U8[1];
@@ -447,7 +458,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp0, wgt1, 0, &out1);
 
         addr_o += h_inp;
-        tmp[addr_o] = (uint8_t)(out1 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out1 >> 8);
 
         // m = 2
         const uchar4 wgt2a = BILIN_WEIGHTS_X_8_U8[2];
@@ -458,7 +469,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp4, wgt2b, out2, &out2);
 
         addr_o += h_inp;
-        tmp[addr_o] = (uint8_t)(out2 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out2 >> 8);
 
         // m = 3
         const uchar4 wgt3 = BILIN_WEIGHTS_X_8_U8[4];
@@ -467,7 +478,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp4, wgt3, 0, &out3);
 
         addr_o += h_inp;
-        tmp[addr_o] = (uint8_t)(out3 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out3 >> 8);
 
         // m = 4
         const uchar4 wgt4 = BILIN_WEIGHTS_X_8_U8[5];
@@ -476,7 +487,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp4, wgt4, 0, &out4);
 
         addr_o += h_inp;
-        tmp[addr_o] = (uint8_t)(out4 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out4 >> 8);
 
         // m = 5
         const uchar4 wgt5a = BILIN_WEIGHTS_X_8_U8[6];
@@ -487,7 +498,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp8, wgt5b, out5, &out5);
 
         addr_o += h_inp;
-        tmp[addr_o] = (uint8_t)(out5 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out5 >> 8);
 
         // m = 6
         const uchar4 wgt6 = BILIN_WEIGHTS_X_8_U8[8];
@@ -496,7 +507,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp8, wgt6, 0, &out6);
 
         addr_o += h_inp;
-        tmp[addr_o] = (uint8_t)(out6 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out6 >> 8);
 
         // m = 7
         const uchar4 wgt7 = BILIN_WEIGHTS_X_8_U8[9];
@@ -505,7 +516,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(inp8, wgt7, 0, &out7);
 
         addr_o += h_inp;
-        tmp[addr_o] = (uint8_t)(out7 >> 8); // TODO: rounding
+        tmp[addr_o] = (uint8_t)(out7 >> 8);
     }
 
     // Next, columns
@@ -526,7 +537,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(tmp0, wgt0, 0, &out0);
 
         unsigned int addr_o = m;
-        out[addr_o] = (uint8_t)(out0 >> SHR_QUANT); // TODO: rounding
+        out[addr_o] = (uint8_t)(out0 >> SHR_QUANT);
 
         // n = 1
         const uchar4 wgt1a = BILIN_WEIGHTS_Y_5_U8[1];
@@ -537,7 +548,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(tmp4, wgt1b, out1, &out1);
 
         addr_o += w_out;
-        out[addr_o] = (uint8_t)(out1 >> SHR_QUANT); // TODO: rounding
+        out[addr_o] = (uint8_t)(out1 >> SHR_QUANT);
 
         // n = 2
         const uchar4 wgt2a = BILIN_WEIGHTS_Y_5_U8[3];
@@ -550,7 +561,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(tmp8, wgt2c, out2, &out2);
 
         addr_o += w_out;
-        out[addr_o] = (uint8_t)(out2 >> SHR_QUANT); // TODO: rounding
+        out[addr_o] = (uint8_t)(out2 >> SHR_QUANT);
 
         // n = 3
         const uchar4 wgt3a = BILIN_WEIGHTS_Y_5_U8[6];
@@ -561,7 +572,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(tmp8, wgt3b, out3, &out3);
 
         addr_o += w_out;
-        out[addr_o] = (uint8_t)(out3 >> SHR_QUANT); // TODO: rounding
+        out[addr_o] = (uint8_t)(out3 >> SHR_QUANT);
 
         // n = 4
         const uchar4 wgt4 = BILIN_WEIGHTS_Y_5_U8[8];

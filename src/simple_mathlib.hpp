@@ -291,6 +291,18 @@ inline uint8_t satadd_u8(uint8_t lhs, uint8_t rhs)
     return res;
 }
 
+inline uint32_t satadd_u32(uint32_t lhs, uint32_t rhs)
+{
+    uint32_t res = lhs + rhs;
+
+    if (res < lhs)
+    {
+        res = UINT32_MAX;
+    }
+
+    return res;
+}
+
 
 struct Vec4u8
 {
@@ -529,11 +541,22 @@ inline Vec4u8 max4u8(Vec4u8 a, Vec4u8 b)
     };
 }
 
+inline uint32_t shr_round_u32(uint32_t inp, uint8_t amt)
+{
+    if (amt > 0)
+    {
+        inp = satadd_u32(inp, 1 << (amt-1));
+    }
+
+    return (inp >> amt);
+}
+
 inline Vec4u8 shr_round_4u8(Vec4u8 inp, uint8_t amt)
 {
     // amt &= 0b11111;
 
-    if (amt > 0) {
+    if (amt > 0)
+    {
         inp = inp.satadd(1 << (amt - 1));
     }
 
