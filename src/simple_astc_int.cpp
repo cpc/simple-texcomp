@@ -8,6 +8,8 @@
 /* Defines compile-time constants in the Aamu repo */
 #include "constants.hpp"
 
+#define ZoneNamedN(x,y,z)
+
 // Size of the pixel blocks the image will be split into
 // constexpr unsigned int BLOCK_X = 12;
 // constexpr unsigned int BLOCK_Y = 12;
@@ -134,6 +136,8 @@ inline void _write_bits(
 
 #include "simple_mathlib.hpp"
 #include "simple_texcomp.hpp"
+
+#include <Tracy.hpp>
 
 using namespace simple;
 
@@ -357,6 +361,8 @@ inline uint32_t log2(uint32_t x)
   */
 inline uint32_t approx_inv_u32(uint32_t x)
 {
+    ZoneScopedN("approx_inv");
+
     // Useful constants
     constexpr unsigned int A = 0x0000F0F1;            // 32.0 / 17.0  Q2.15
     constexpr unsigned int B = 0xB4B4B4B5;            // 48.0 / 17.0  Q2.30
@@ -484,6 +490,8 @@ inline void downsample_12x12_to_8x5_u8_quant(
     const uint8_t inp[BLOCK_PX_CNT],
     uint8_t out[WGT_CNT]
 ){
+    ZoneScopedN("downsample");
+
     constexpr unsigned int w_inp = 12;
     constexpr unsigned int h_inp = 12;
     constexpr unsigned int w_out = 8;
@@ -685,6 +693,8 @@ void encode_block_int(
     /***** Here starts the actual function without the preprocessor mess *****/
     /*************************************************************************/
 
+    ZoneScopedN("enc_blk_astc");
+
     unsigned int xb = block_id_x * BLOCK_X;
     unsigned int yb = block_id_y * BLOCK_Y;
 
@@ -696,22 +706,25 @@ void encode_block_int(
     uchar4 maxcol = { 0, 0, 0, 0 };
 
     // Read pixel block into a 1D array and select min/max at the same time
-    for (unsigned int y = 0; y < BLOCK_Y; ++y)
     {
-        const unsigned int off = img_w * (yb + y) + xb;
-
-        for (unsigned int x = 0; x < BLOCK_X; ++x)
+        ZoneScopedN("minmax");
+        for (unsigned int y = 0; y < BLOCK_Y; ++y)
         {
-            const unsigned int i_inp = (off + x) << 2; // assuming NCH_RGB = 4
-            const unsigned int i_out = y*BLOCK_X + x;
+            const unsigned int off = img_w * (yb + y) + xb;
 
-            uchar4 px;
-            _load_4u8(inp_img+i_inp, &px);
+            for (unsigned int x = 0; x < BLOCK_X; ++x)
+            {
+                const unsigned int i_inp = (off + x) << 2; // assuming NCH_RGB = 4
+                const unsigned int i_out = y*BLOCK_X + x;
 
-            _min_4u8(px, mincol, &mincol);
-            _max_4u8(px, maxcol, &maxcol);
+                uchar4 px;
+                _load_4u8(inp_img+i_inp, &px);
 
-            block_pixels[i_out] = px;
+                _min_4u8(px, mincol, &mincol);
+                _max_4u8(px, maxcol, &maxcol);
+
+                block_pixels[i_out] = px;
+            }
         }
     }
 
@@ -800,19 +813,22 @@ void encode_block_int(
         // downsampling
         uint8_t ideal_weights[BLOCK_PX_CNT];
 
-        for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
         {
-            uchar4 diff;
-            _saturating_sub_4u8(block_pixels[i], mincol, &diff);
+            ZoneScopedN("px_map");
+            for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
+            {
+                uchar4 diff;
+                _saturating_sub_4u8(block_pixels[i], mincol, &diff);
 
-            // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
-            // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
-            // recover lost precision by adding one
-            uint32_t res;
-            _saturating_dot_acc_4u8(diff, ep_sc8, one, &res);
-            ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
+                // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
+                // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
+                // recover lost precision by adding one
+                uint32_t res;
+                _saturating_dot_acc_4u8(diff, ep_sc8, one, &res);
+                ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
 
-            // printf("iwgt[%3d] : %#04x\n", i, ideal_weights[i]);
+                // printf("iwgt[%3d] : %#04x\n", i, ideal_weights[i]);
+            }
         }
 
         downsample_12x12_to_8x5_u8_quant(
