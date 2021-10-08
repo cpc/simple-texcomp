@@ -17,7 +17,7 @@ typedef enum enc_format_t {
 
 /* Define encoding format here */
 #ifndef ENC_FORMAT_DEF
-#define ENC_FORMAT_DEF ASTC
+#define ENC_FORMAT_DEF ASTC_INT
 #endif
 constexpr enc_format_t ENC_FORMAT = ENC_FORMAT_DEF;
 

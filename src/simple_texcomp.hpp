@@ -24,7 +24,7 @@ constexpr decimal EPSILON = 1e-6f;
 #endif
 
 /* Number of channels if a RGB pixel. Used for calculating data sizes */
-#if defined(ANDROID) && (ENC_FORMAT_DEF == ASTC)
+#if (ENC_FORMAT_DEF != ASTC_INT) && defined(ANDROID)
 constexpr int NCH_RGB  = 3;
 #else
 constexpr int NCH_RGB  = 4;

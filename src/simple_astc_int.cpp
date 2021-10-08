@@ -659,6 +659,49 @@ inline void downsample_12x12_to_8x5_u8_quant(
     }
 }
 
+/** Read one block from the input image and calculate its min/max values
+ */
+inline void read_block_min_max(
+    const uint8_t* __restrict__ inp,
+    unsigned int block_id_x,
+    unsigned int block_id_y,
+    unsigned int img_w,
+    uchar4* mincol,
+    uchar4* maxcol,
+    uchar4 block_pixels[BLOCK_PX_CNT]
+) {
+    ZoneScopedN("minmax");
+
+    unsigned int xb = block_id_x * BLOCK_X;
+    unsigned int yb = block_id_y * BLOCK_Y;
+
+    // Color endpoints - min and max colors in the current block
+    uchar4 _mincol = { 255, 255, 255, 255 };
+    uchar4 _maxcol = { 0, 0, 0, 0 };
+
+    for (unsigned int y = 0; y < BLOCK_Y; ++y)
+    {
+        const unsigned int off = img_w * (yb + y) + xb;
+
+        for (unsigned int x = 0; x < BLOCK_X; ++x)
+        {
+            const unsigned int i_inp = (off + x) << 2; // assuming NCH_RGB = 4
+            const unsigned int i_out = y*BLOCK_X + x;
+
+            uchar4 px;
+            _load_4u8(inp+i_inp, &px);
+
+            _min_4u8(px, _mincol, &_mincol);
+            _max_4u8(px, _maxcol, &_maxcol);
+
+            block_pixels[i_out] = px;
+        }
+    }
+
+    *mincol = _mincol;
+    *maxcol = _maxcol;
+}
+
 /** Encode a block of pixels
  *
  * The block_id_x/y could be substituted with get_global_id() if converted to
@@ -695,38 +738,12 @@ void encode_block_int(
 
     ZoneScopedN("enc_blk_astc");
 
-    unsigned int xb = block_id_x * BLOCK_X;
-    unsigned int yb = block_id_y * BLOCK_Y;
-
-    // Input pixel block as 1D array
+    // Input pixel block as 1D array & min/max pixel values
     uchar4 block_pixels[BLOCK_PX_CNT];
-
-    // Color endpoints - min and max colors in the current block
-    uchar4 mincol = { 255, 255, 255, 255 };
-    uchar4 maxcol = { 0, 0, 0, 0 };
+    uchar4 mincol, maxcol;
 
     // Read pixel block into a 1D array and select min/max at the same time
-    {
-        ZoneScopedN("minmax");
-        for (unsigned int y = 0; y < BLOCK_Y; ++y)
-        {
-            const unsigned int off = img_w * (yb + y) + xb;
-
-            for (unsigned int x = 0; x < BLOCK_X; ++x)
-            {
-                const unsigned int i_inp = (off + x) << 2; // assuming NCH_RGB = 4
-                const unsigned int i_out = y*BLOCK_X + x;
-
-                uchar4 px;
-                _load_4u8(inp_img+i_inp, &px);
-
-                _min_4u8(px, mincol, &mincol);
-                _max_4u8(px, maxcol, &maxcol);
-
-                block_pixels[i_out] = px;
-            }
-        }
-    }
+    read_block_min_max(inp_img, block_id_x, block_id_y, img_w, &mincol, &maxcol, block_pixels);
 
     // print_minmax_u8("   ", mincol, maxcol);
 
