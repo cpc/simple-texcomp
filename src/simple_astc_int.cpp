@@ -1,5 +1,10 @@
 #include <stdint.h>
 
+#ifdef ANDROID
+#include <cstring>
+#include <arm_neon.h>
+#endif  // ANDROID
+
 #ifdef __TCE__
 
 #include <tceops.h>
@@ -204,6 +209,7 @@ inline void _max_4u8(uchar4 px, uchar4 maxcol, uchar4* out)
 
 inline void _max_u32(uint32_t lhs, uint32_t rhs, uint32_t* out)
 {
+    ZoneScopedN("max_u32");
     *out = u32max(lhs, rhs);
 }
 
@@ -243,6 +249,7 @@ inline void _saturating_dot_acc_4u8(
 /* Unpack the first three elements of uchar4 vector into 32b array */
 inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
 {
+    ZoneScopedN("unpack_rgb");
     out[0] = static_cast<uint32_t>(v.x);
     out[1] = static_cast<uint32_t>(v.y);
     out[2] = static_cast<uint32_t>(v.z);
@@ -476,6 +483,7 @@ inline uint32_t approx_inv_u32(uint32_t x)
 /* Pack the first three elements of input 32b array into uchar4 vector */
 inline void pack_rgb_u8(uint32_t a[3], uchar4* out)
 {
+    ZoneScopedN("pack_rgb");
     out->x = (uint8_t)(a[0]);
     out->y = (uint8_t)(a[1]);
     out->z = (uint8_t)(a[2]);
@@ -679,6 +687,44 @@ inline void read_block_min_max(
     uchar4 _mincol = { 255, 255, 255, 255 };
     uchar4 _maxcol = { 0, 0, 0, 0 };
 
+#ifdef ANDROID
+
+    // Load pixels into a continuous array
+    // #pragma clang loop vectorize(assume_safety)
+    for (unsigned int y = 0; y < BLOCK_Y; ++y)
+    {
+        const unsigned int off = img_w * (yb + y) + xb;
+
+        memcpy(
+            (uint8_t*)(block_pixels) + (NCH_RGB * y * BLOCK_X),
+            inp + (NCH_RGB * off),
+            NCH_RGB * BLOCK_X
+        );
+    }
+
+    uint8_t tmp_min[3] = { 255, 255, 255 };
+    uint8_t tmp_max[3] = { 0, 0, 0 };
+
+    // #pragma clang loop vectorize_width(4, scalable)
+    // #pragma clang loop interleave_count(2)
+    #pragma clang loop vectorize(assume_safety)
+    for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
+    {
+        // _min_4u8(_mincol, block_pixels[i], &_mincol);
+        // _max_4u8(_maxcol, block_pixels[i], &_maxcol);
+        tmp_min[0] = u8min(tmp_min[0], block_pixels[i].x);
+        tmp_min[1] = u8min(tmp_min[1], block_pixels[i].y);
+        tmp_min[2] = u8min(tmp_min[2], block_pixels[i].z);
+        tmp_max[0] = u8max(tmp_max[0], block_pixels[i].x);
+        tmp_max[1] = u8max(tmp_max[1], block_pixels[i].y);
+        tmp_max[2] = u8max(tmp_max[2], block_pixels[i].z);
+    }
+
+    _mincol = { tmp_min[0], tmp_min[1], tmp_min[2], 255 };
+    _maxcol = { tmp_max[0], tmp_max[1], tmp_max[2], 255 };
+
+#else  // ANDROID
+
     for (unsigned int y = 0; y < BLOCK_Y; ++y)
     {
         const unsigned int off = img_w * (yb + y) + xb;
@@ -697,6 +743,8 @@ inline void read_block_min_max(
             block_pixels[i_out] = px;
         }
     }
+
+#endif  // ANDROID
 
     *mincol = _mincol;
     *maxcol = _maxcol;
