@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include "platform.hpp"
+
 #ifdef ANDROID
 #include <cstring>
 #include <arm_neon.h>
@@ -676,7 +678,10 @@ inline void read_block_min_max(
     unsigned int img_w,
     uchar4* mincol,
     uchar4* maxcol,
-    uchar4 block_pixels[BLOCK_PX_CNT]
+    uchar4 block_pixels[BLOCK_PX_CNT],
+    uint8x16_t* mincol_x4,
+    uint8x16_t* maxcol_x4,
+    uint8x16_t block_pixels_x4[36]
 ) {
     ZoneScopedN("minmax");
 
@@ -688,40 +693,116 @@ inline void read_block_min_max(
     uchar4 _maxcol = { 0, 0, 0, 0 };
 
 #ifdef ANDROID
-
     // Load pixels into a continuous array
     // #pragma clang loop vectorize(assume_safety)
-    for (unsigned int y = 0; y < BLOCK_Y; ++y)
+    // for (unsigned int y = 0; y < BLOCK_Y; ++y)
+    // {
+    //     const unsigned int off = img_w * (yb + y) + xb;
+
+    //     memcpy(
+    //         (uint8_t*)(block_pixels) + (NCH_RGB * y * BLOCK_X),
+    //         inp + (NCH_RGB * off),
+    //         NCH_RGB * BLOCK_X
+    //     );
+    // }
+
+    // uint8_t tmp_min[3] = { 255, 255, 255 };
+    // uint8_t tmp_max[3] = { 0, 0, 0 };
+
+    // // #pragma clang loop vectorize_width(4, scalable)
+    // // #pragma clang loop interleave_count(2)
+    // #pragma clang loop vectorize(assume_safety)
+    // for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
+    // {
+    //     // _min_4u8(_mincol, block_pixels[i], &_mincol);
+    //     // _max_4u8(_maxcol, block_pixels[i], &_maxcol);
+    //     tmp_min[0] = u8min(tmp_min[0], block_pixels[i].x);
+    //     tmp_min[1] = u8min(tmp_min[1], block_pixels[i].y);
+    //     tmp_min[2] = u8min(tmp_min[2], block_pixels[i].z);
+    //     tmp_max[0] = u8max(tmp_max[0], block_pixels[i].x);
+    //     tmp_max[1] = u8max(tmp_max[1], block_pixels[i].y);
+    //     tmp_max[2] = u8max(tmp_max[2], block_pixels[i].z);
+    // }
+
+    // _mincol = { tmp_min[0], tmp_min[1], tmp_min[2], 255 };
+    // _maxcol = { tmp_max[0], tmp_max[1], tmp_max[2], 255 };
+
+    // SIMD version
+    // uint8x16_t r[9];
+    // uint8x16_t g[9];
+    // uint8x16_t b[9];
+    // uint8x16_t rgba_x4[36];  // 36 = 9*4 = 12*3
+
+    // uint8x16_t r_min_v = { 255 };
+    // uint8x16_t r_max_v = { 0 };
+
+    // uint8x16_t r_idx = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    // uint8x16_t g_idx = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    // uint8x16_t b_idx = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
+
+    uint8x16_t min_x4 = { 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
+    uint8x16_t max_x4 = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+
+    // x = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+    // uint8_t arr[16] = { 0 };
+    // vst2_u8(arr, x);
+    // for (int i = 0; i < 16; ++i)
+    // {
+    //     LOGI("arr[%2d]: %3d\n", i, arr[i]);
+    // }
+
+    for (unsigned int y = 0, i = 0; y < BLOCK_Y; ++y, i +=3)
     {
         const unsigned int off = img_w * (yb + y) + xb;
 
-        memcpy(
-            (uint8_t*)(block_pixels) + (NCH_RGB * y * BLOCK_X),
-            inp + (NCH_RGB * off),
-            NCH_RGB * BLOCK_X
-        );
+        block_pixels_x4[3*i+0] = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
+        block_pixels_x4[3*i+1] = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
+        block_pixels_x4[3*i+2] = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
+
+        min_x4 = vminq_u8(min_x4, block_pixels_x4[3*i+0]);
+        min_x4 = vminq_u8(min_x4, block_pixels_x4[3*i+1]);
+        min_x4 = vminq_u8(min_x4, block_pixels_x4[3*i+2]);
+
+        max_x4 = vmaxq_u8(max_x4, block_pixels_x4[3*i+0]);
+        max_x4 = vmaxq_u8(max_x4, block_pixels_x4[3*i+1]);
+        max_x4 = vmaxq_u8(max_x4, block_pixels_x4[3*i+2]);
     }
 
-    uint8_t tmp_min[3] = { 255, 255, 255 };
-    uint8_t tmp_max[3] = { 0, 0, 0 };
+    const uint8x16_t mask_min_r_x4 = { 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255 };
+    const uint8x16_t mask_min_g_x4 = { 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255 };
+    const uint8x16_t mask_min_b_x4 = { 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255 };
 
-    // #pragma clang loop vectorize_width(4, scalable)
-    // #pragma clang loop interleave_count(2)
-    #pragma clang loop vectorize(assume_safety)
-    for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
-    {
-        // _min_4u8(_mincol, block_pixels[i], &_mincol);
-        // _max_4u8(_maxcol, block_pixels[i], &_maxcol);
-        tmp_min[0] = u8min(tmp_min[0], block_pixels[i].x);
-        tmp_min[1] = u8min(tmp_min[1], block_pixels[i].y);
-        tmp_min[2] = u8min(tmp_min[2], block_pixels[i].z);
-        tmp_max[0] = u8max(tmp_max[0], block_pixels[i].x);
-        tmp_max[1] = u8max(tmp_max[1], block_pixels[i].y);
-        tmp_max[2] = u8max(tmp_max[2], block_pixels[i].z);
-    }
+    const uint8x16_t mask_max_r_x4 = { 255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0   };
+    const uint8x16_t mask_max_g_x4 = { 0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0   };
+    const uint8x16_t mask_max_b_x4 = { 0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0   };
 
-    _mincol = { tmp_min[0], tmp_min[1], tmp_min[2], 255 };
-    _maxcol = { tmp_max[0], tmp_max[1], tmp_max[2], 255 };
+    const uint8x16_t min_r_x4 = vorrq_u8(min_x4, mask_min_r_x4);
+    const uint8x16_t min_g_x4 = vorrq_u8(min_x4, mask_min_g_x4);
+    const uint8x16_t min_b_x4 = vorrq_u8(min_x4, mask_min_b_x4);
+
+    const uint8x16_t max_r_x4 = vandq_u8(max_x4, mask_max_r_x4);
+    const uint8x16_t max_g_x4 = vandq_u8(max_x4, mask_max_g_x4);
+    const uint8x16_t max_b_x4 = vandq_u8(max_x4, mask_max_b_x4);
+
+    const uint8_t min_r = vminvq_u8(min_r_x4);
+    const uint8_t min_g = vminvq_u8(min_g_x4);
+    const uint8_t min_b = vminvq_u8(min_b_x4);
+
+    const uint8_t max_r = vmaxvq_u8(max_r_x4);
+    const uint8_t max_g = vmaxvq_u8(max_g_x4);
+    const uint8_t max_b = vmaxvq_u8(max_b_x4);
+
+    // LOGI("min:  %3d %3d %3d  (ref: %3d %3d %3d)", min_r, min_g, min_b,
+    //     _mincol.x, _mincol.y, _mincol.z);
+    // LOGI("max:  %3d %3d %3d  (ref: %3d %3d %3d)", max_r, max_g, max_b,
+    //     _maxcol.x, _maxcol.y, _maxcol.z);
+
+    *mincol_x4 = { min_r, min_g, min_b, 255, min_r, min_g, min_b, 255,  min_r, min_g, min_b, 255,  min_r, min_g, min_b, 255 };
+    *maxcol_x4 = { max_r, max_g, max_b, 255, max_r, max_g, max_b, 255,  max_r, max_g, max_b, 255,  max_r, max_g, max_b, 255 };
+
+    _mincol = { min_r, min_g, min_b, 255 };
+    _maxcol = { max_r, max_g, max_b, 255 };
 
 #else  // ANDROID
 
@@ -790,8 +871,12 @@ void encode_block_int(
     uchar4 block_pixels[BLOCK_PX_CNT];
     uchar4 mincol, maxcol;
 
+    uint8x16_t block_pixels_x4[BLOCK_PX_CNT];
+    uint8x16_t mincol_x4, maxcol_x4;
+
     // Read pixel block into a 1D array and select min/max at the same time
-    read_block_min_max(inp_img, block_id_x, block_id_y, img_w, &mincol, &maxcol, block_pixels);
+    read_block_min_max(inp_img, block_id_x, block_id_y, img_w, &mincol, &maxcol, block_pixels,
+        &mincol_x4, &maxcol_x4, block_pixels_x4);
 
     // print_minmax_u8("   ", mincol, maxcol);
 
