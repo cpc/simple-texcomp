@@ -877,6 +877,13 @@ void encode_block_int(
             ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
         };
 
+        int32x4_t shl_res_x4 {
+            -(int32_t)(shr_res),
+            -(int32_t)(shr_res),
+            -(int32_t)(shr_res),
+            -(int32_t)(shr_res)
+        };
+
         for (unsigned int i = 0; i < BLOCK_PX_CNT / 4; ++i)
         {
             uint8x16_t diff_x4 = vqsubq_u8(block_pixels_x4[i], mincol_x4);
@@ -889,12 +896,17 @@ void encode_block_int(
             // LOGI("dot[%3d]: %6d\n", 4*i+2, dot_x4[2]);
             // LOGI("dot[%3d]: %6d\n", 4*i+3, dot_x4[3]);
 
-            // uint32x4_t res_x4 = vshrq_n_u32(dot_x4, shr_res);
+            uint32x4_t res_x4 = vshlq_u32(dot_x4, shl_res_x4);
 
-           // ideal_weights[4*i+0] = (uint8_t)(res_x4[0]);
-           // ideal_weights[4*i+1] = (uint8_t)(res_x4[1]);
-           // ideal_weights[4*i+2] = (uint8_t)(res_x4[2]);
-           // ideal_weights[4*i+3] = (uint8_t)(res_x4[3]);
+            ideal_weights[4*i+0] = (uint8_t)(res_x4[0]);
+            ideal_weights[4*i+1] = (uint8_t)(res_x4[1]);
+            ideal_weights[4*i+2] = (uint8_t)(res_x4[2]);
+            ideal_weights[4*i+3] = (uint8_t)(res_x4[3]);
+
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+0, ideal_weights[4*i+0]);
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+1, ideal_weights[4*i+1]);
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+2, ideal_weights[4*i+2]);
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+3, ideal_weights[4*i+3]);
         }
     }
 
