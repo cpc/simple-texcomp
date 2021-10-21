@@ -43,21 +43,25 @@ inline void read_block_min_max(
     uint8x16_t min_x4 = { 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
     uint8x16_t max_x4 = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-    for (unsigned int y = 0, i = 0; y < BLOCK_Y; ++y, i +=3)
+    for (unsigned int y = 0; y < BLOCK_Y; ++y)
     {
         const unsigned int off = img_w * (yb + y) + xb;
 
-        block_pixels_x4[3*i+0] = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
-        block_pixels_x4[3*i+1] = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
-        block_pixels_x4[3*i+2] = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
+        uint8x16_t r = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
+        uint8x16_t g = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
+        uint8x16_t b = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
 
-        min_x4 = vminq_u8(min_x4, block_pixels_x4[3*i+0]);
-        min_x4 = vminq_u8(min_x4, block_pixels_x4[3*i+1]);
-        min_x4 = vminq_u8(min_x4, block_pixels_x4[3*i+2]);
+        min_x4 = vminq_u8(min_x4, r);
+        min_x4 = vminq_u8(min_x4, g);
+        min_x4 = vminq_u8(min_x4, b);
 
-        max_x4 = vmaxq_u8(max_x4, block_pixels_x4[3*i+0]);
-        max_x4 = vmaxq_u8(max_x4, block_pixels_x4[3*i+1]);
-        max_x4 = vmaxq_u8(max_x4, block_pixels_x4[3*i+2]);
+        max_x4 = vmaxq_u8(max_x4, r);
+        max_x4 = vmaxq_u8(max_x4, g);
+        max_x4 = vmaxq_u8(max_x4, b);
+
+        block_pixels_x4[3*y+0] = r;
+        block_pixels_x4[3*y+1] = g;
+        block_pixels_x4[3*y+2] = b;
     }
 
     const uint8x16_t mask_min_r_x4 = { 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255 };
@@ -76,13 +80,13 @@ inline void read_block_min_max(
     const uint8x16_t max_g_x4 = vandq_u8(max_x4, mask_max_g_x4);
     const uint8x16_t max_b_x4 = vandq_u8(max_x4, mask_max_b_x4);
 
-    const uint8_t min_r = vminvq_u8(min_r_x4);
-    const uint8_t min_g = vminvq_u8(min_g_x4);
-    const uint8_t min_b = vminvq_u8(min_b_x4);
+    const uint8_t min_r = vminvq_u8(min_r_x4);  // requires A64
+    const uint8_t min_g = vminvq_u8(min_g_x4);  // requires A64
+    const uint8_t min_b = vminvq_u8(min_b_x4);  // requires A64
 
-    const uint8_t max_r = vmaxvq_u8(max_r_x4);
-    const uint8_t max_g = vmaxvq_u8(max_g_x4);
-    const uint8_t max_b = vmaxvq_u8(max_b_x4);
+    const uint8_t max_r = vmaxvq_u8(max_r_x4);  // requires A64
+    const uint8_t max_g = vmaxvq_u8(max_g_x4);  // requires A64
+    const uint8_t max_b = vmaxvq_u8(max_b_x4);  // requires A64
 
     *mincol = uchar4 { min_r, min_g, min_b, 255 };
     *maxcol = uchar4 { max_r, max_g, max_b, 255 };
