@@ -32,7 +32,7 @@ inline void read_block_min_max(
     unsigned int img_w,
     uchar4* mincol,
     uchar4* maxcol,
-    uint8x16_t block_pixels_x4[36]  // 36 == 12 * 3 == 9 * 4
+    uint8x16_t block_pixels[36]  // 36 == 12 * 3 == 9 * 4
 ) {
     ZoneScopedN("minmax");
 
@@ -40,8 +40,13 @@ inline void read_block_min_max(
     unsigned int yb = block_id_y * BLOCK_Y;
 
     // Color endpoints - min and max colors in the current block
-    uint8x16_t min_x4 = { 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
-    uint8x16_t max_x4 = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    uint8x16_t min_x4 = {
+        255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255
+    };
+    uint8x16_t max_x4 = {
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
 
     for (unsigned int y = 0; y < BLOCK_Y; ++y)
     {
@@ -59,18 +64,36 @@ inline void read_block_min_max(
         max_x4 = vmaxq_u8(max_x4, g);
         max_x4 = vmaxq_u8(max_x4, b);
 
-        block_pixels_x4[3*y+0] = r;
-        block_pixels_x4[3*y+1] = g;
-        block_pixels_x4[3*y+2] = b;
+        block_pixels[3*y+0] = r;
+        block_pixels[3*y+1] = g;
+        block_pixels[3*y+2] = b;
     }
 
-    const uint8x16_t mask_min_r_x4 = { 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255 };
-    const uint8x16_t mask_min_g_x4 = { 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255 };
-    const uint8x16_t mask_min_b_x4 = { 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255 };
+    const uint8x16_t mask_min_r_x4 = {
+        0,   255, 255, 255, 0,   255, 255, 255,
+        0,   255, 255, 255, 0,   255, 255, 255
+    };
+    const uint8x16_t mask_min_g_x4 = {
+        255, 0,   255, 255, 255, 0,   255, 255,
+        255, 0,   255, 255, 255, 0,   255, 255
+    };
+    const uint8x16_t mask_min_b_x4 = {
+        255, 255, 0,   255, 255, 255, 0,   255,
+        255, 255, 0,   255, 255, 255, 0,   255
+    };
 
-    const uint8x16_t mask_max_r_x4 = { 255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0   };
-    const uint8x16_t mask_max_g_x4 = { 0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0   };
-    const uint8x16_t mask_max_b_x4 = { 0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0,   0,   0,   255, 0   };
+    const uint8x16_t mask_max_r_x4 = {
+        255, 0,   0,   0,   255, 0,   0,   0,
+        255, 0,   0,   0,   255, 0,   0,   0
+    };
+    const uint8x16_t mask_max_g_x4 = {
+        0,   255, 0,   0,   0,   255, 0,   0,
+        0,   255, 0,   0,   0,   255, 0,   0
+    };
+    const uint8x16_t mask_max_b_x4 = {
+        0,   0,   255, 0,   0,   0,   255, 0,
+        0,   0,   255, 0,   0,   0,   255, 0
+    };
 
     const uint8x16_t min_r_x4 = vorrq_u8(min_x4, mask_min_r_x4);
     const uint8x16_t min_g_x4 = vorrq_u8(min_x4, mask_min_g_x4);
@@ -105,11 +128,19 @@ void encode_block_int(
     const unsigned int NB_X = img_w / BLOCK_X;
 
     // Input pixel block as 1D array & min/max pixel values
-    uint8x16_t block_pixels_x4[BLOCK_PX_CNT / 4];
+    uint8x16_t block_pixels[BLOCK_PX_CNT / 4];
     uchar4 mincol, maxcol;
 
     // Read pixel block into a 1D array and select min/max at the same time
-    read_block_min_max(inp_img, block_id_x, block_id_y, img_w, &mincol, &maxcol, block_pixels_x4);
+    read_block_min_max(
+        inp_img,
+        block_id_x,
+        block_id_y,
+        img_w,
+        &mincol,
+        &maxcol,
+        block_pixels
+    );
 
     // Calculate output data address (16 bytes per block)
     out_data = out_data + ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP);
@@ -866,11 +897,19 @@ void encode_block_int(
     ZoneScopedN("enc_blk_astc");
 
     // Input pixel block as 1D array & min/max pixel values
-    uchar4 block_pixels[BLOCK_PX_CNT];
+    uchar4 block_pixels[BLOCK_PX_CNT / 4];
     uchar4 mincol, maxcol;
 
     // Read pixel block into a 1D array and select min/max at the same time
-    read_block_min_max(inp_img, block_id_x, block_id_y, img_w, &mincol, &maxcol, block_pixels);
+    read_block_min_max(
+        inp_img,
+        block_id_x,
+        block_id_y,
+        img_w,
+        &mincol,
+        &maxcol,
+        block_pixels
+    );
 
     // print_minmax_u8("   ", mincol, maxcol);
 
