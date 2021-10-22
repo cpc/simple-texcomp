@@ -585,7 +585,7 @@ inline void read_block_min_max(
 }
 
 inline void downsample_12x12_to_8x5_u8_quant(
-    const uint8_t inp[BLOCK_PX_CNT],
+    const uint8_t inp[192],
     uint8_t out[WGT_CNT]
 ){
     constexpr unsigned int w_inp = 12;
@@ -593,54 +593,138 @@ inline void downsample_12x12_to_8x5_u8_quant(
     constexpr unsigned int w_out = 8;
     constexpr unsigned int h_out = 5;
 
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_0 = {
+    constexpr uint8x8_t BILIN_WEIGHTS_X_0 = {
         187, 111,  42,  90,  30,  71,  16,  68,
     };
 
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_1 = {
+    constexpr uint8x8_t BILIN_WEIGHTS_X_1 = {
          68, 128, 142, 135, 135, 142, 128, 187,
     };
 
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_2 = {
+    constexpr uint8x8_t BILIN_WEIGHTS_X_2 = {
           0,  16,  71,  30,  90,  42, 111,  0,
     };
 
     constexpr uint8x8_t IDX_X = { 0, 1, 2, 4, 5, 7, 8, 10 };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_0[3] = {
+        { 134, 134, 134, 134, 134, 134, 134, 134, },
+        { 85,  85,  85,  85,  85,  85,  85,  85,  },
+        { 36,  36,  36,  36,  36,  36,  36,  36,  },
+    };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_1[5] = {
+        { 34, 34, 34, 34, 34, 34, 34, 34, },
+        { 68, 68, 68, 68, 68, 68, 68, 68, },
+        { 85, 85, 85, 85, 85, 85, 85, 85, },
+        { 51, 51, 51, 51, 51, 51, 51, 51, },
+        { 17, 17, 17, 17, 17, 17, 17, 17, },
+    };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_2[6] = {
+        { 8,  8,  8,  8,  8,  8,  8,  8,  },
+        { 42, 42, 42, 42, 42, 42, 42, 42, },
+        { 77, 77, 77, 77, 77, 77, 77, 77, },
+        { 77, 77, 77, 77, 77, 77, 77, 77, },
+        { 42, 42, 42, 42, 42, 42, 42, 42, },
+        { 8,  8,  8,  8,  8,  8,  8,  8,  },
+    };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_3[5] = {
+        { 17, 17, 17, 17, 17, 17, 17, 17, },
+        { 51, 51, 51, 51, 51, 51, 51, 51, },
+        { 85, 85, 85, 85, 85, 85, 85, 85, },
+        { 68, 68, 68, 68, 68, 68, 68, 68, },
+        { 34, 34, 34, 34, 34, 34, 34, 34, },
+    };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_4[3] = {
+        { 36,  36,  36,  36,  36,  36,  36,  36,  },
+        { 85,  85,  85,  85,  85,  85,  85,  85,  },
+        { 134, 134, 134, 134, 134, 134, 134, 134, },
+    };
 
     uint8x8_t tmp[h_inp];
 
     // First, interpolate rows.
     for (unsigned int y = 0; y < h_inp; ++y)
     {
+        // TODO: This reads beyond the size of ideal_weights
         // Align the input values so that 1st, 2nd and 3rd samples of the input
         // row are at the 0th position of row0/1/2
-        uint8x16_t row0_u16 = vld1q_u8(inp + y*w_inp);
-        uint8x16_t row1_u16 = vextq_u8(row0_u16, row0_u16, 1);
-        uint8x16_t row2_u16 = vextq_u8(row0_u16, row0_u16, 2);
+        const uint8x16_t row0_u16 = vld1q_u8(inp + y*w_inp);
+        const uint8x16_t row1_u16 = vextq_u8(row0_u16, row0_u16, 1);
+        const uint8x16_t row2_u16 = vextq_u8(row0_u16, row0_u16, 2);
 
         // We calculate only 8 values => pack them into one 8-byte vector
-        uint8x8_t row0 = vqtbl1_u8(row0_u16, IDX_X);  // table select
-        uint8x8_t row1 = vqtbl1_u8(row1_u16, IDX_X);
-        uint8x8_t row2 = vqtbl1_u8(row2_u16, IDX_X);
+        const uint8x8_t row0 = vqtbl1_u8(row0_u16, IDX_X);  // table select
+        const uint8x8_t row1 = vqtbl1_u8(row1_u16, IDX_X);
+        const uint8x8_t row2 = vqtbl1_u8(row2_u16, IDX_X);
 
         // Results storage
         uint16x8_t res_u16 = { 0 };
 
         // Calculate the dot product by two multiply-adds
-        res_u16 = vmlal_u8(res_u16, row0, BILIN_WEIGHTS_X_U8_0);
-        res_u16 = vmlal_u8(res_u16, row1, BILIN_WEIGHTS_X_U8_1);
-        res_u16 = vmlal_u8(res_u16, row2, BILIN_WEIGHTS_X_U8_2);
+        res_u16 = vmlal_u8(res_u16, row0, BILIN_WEIGHTS_X_0);
+        res_u16 = vmlal_u8(res_u16, row1, BILIN_WEIGHTS_X_1);
+        res_u16 = vmlal_u8(res_u16, row2, BILIN_WEIGHTS_X_2);
 
-        // Shift back from 16-bit to 8-bit precision
+        // Shift back from 16-bit to 8-bit precision and store
         res_u16 = vshrq_n_u16(res_u16, 8);
-
-        // Select results from the two parts and compose the final 8-byte vector
         tmp[y] = vmovn_u16(res_u16);
+    }
 
+    for (unsigned int y = 0; y < h_inp; ++y)
+    {
         LOGI("tmp[%2d] : %3d %3d %3d %3d %3d %3d %3d %3d\n", y,
             tmp[y][0], tmp[y][1], tmp[y][2], tmp[y][3],
             tmp[y][4], tmp[y][5], tmp[y][6], tmp[y][7]
         );
+    }
+
+    // Next, columns (unrolled)
+    uint16x8_t res_u16[h_out] = {
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+    };
+
+    res_u16[0] = vmlal_u8(res_u16[0], tmp[0], BILIN_WEIGHTS_Y_0[0]);
+    res_u16[0] = vmlal_u8(res_u16[0], tmp[1], BILIN_WEIGHTS_Y_0[1]);
+    res_u16[0] = vmlal_u8(res_u16[0], tmp[2], BILIN_WEIGHTS_Y_0[2]);
+
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[1], BILIN_WEIGHTS_Y_1[0]);
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[2], BILIN_WEIGHTS_Y_1[1]);
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[3], BILIN_WEIGHTS_Y_1[2]);
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[4], BILIN_WEIGHTS_Y_1[3]);
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[5], BILIN_WEIGHTS_Y_1[4]);
+
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[3], BILIN_WEIGHTS_Y_2[0]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[4], BILIN_WEIGHTS_Y_2[1]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[5], BILIN_WEIGHTS_Y_2[2]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[6], BILIN_WEIGHTS_Y_2[3]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[7], BILIN_WEIGHTS_Y_2[4]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[8], BILIN_WEIGHTS_Y_2[5]);
+
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[6],  BILIN_WEIGHTS_Y_3[0]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[7],  BILIN_WEIGHTS_Y_3[1]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[8],  BILIN_WEIGHTS_Y_3[2]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[9],  BILIN_WEIGHTS_Y_3[3]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[10], BILIN_WEIGHTS_Y_3[4]);
+
+    res_u16[4] = vmlal_u8(res_u16[4], tmp[9],  BILIN_WEIGHTS_Y_4[0]);
+    res_u16[4] = vmlal_u8(res_u16[4], tmp[10], BILIN_WEIGHTS_Y_4[1]);
+    res_u16[4] = vmlal_u8(res_u16[4], tmp[11], BILIN_WEIGHTS_Y_4[2]);
+
+    constexpr unsigned int SHR_QUANT = 8;// + 6; // Quantize to 2b while storing
+    for (unsigned int n = 0; n < h_out; ++n)
+    {
+        res_u16[n] = vshrq_n_u16(res_u16[n], SHR_QUANT);
+        uint8x8_t res = vmovn_u16(res_u16[n]);
+        // LOGI("addr: %d\n", w_out*n);
+        vst1_u8(&out[w_out*n], res);
     }
 }
 
@@ -762,7 +846,7 @@ void encode_block_int(
             -(int32_t)(shr_res)
         };
 
-        uint8_t ideal_weights[BLOCK_PX_CNT];
+        uint8_t ideal_weights[192] = { 0 };
 
         for (unsigned int i = 0; i < BLOCK_PX_CNT / 4; ++i)
         {
@@ -790,6 +874,16 @@ void encode_block_int(
         }
 
         downsample_12x12_to_8x5_u8_quant(ideal_weights, quantized_weights);
+    }
+
+    for (int i = 0; i < 5; ++i)
+    {
+        LOGI("quant weights[%d]: %3d %3d %3d %3d %3d %3d %3d %3d\n", i,
+            quantized_weights[8*i+0], quantized_weights[8*i+1],
+            quantized_weights[8*i+2], quantized_weights[8*i+3],
+            quantized_weights[8*i+4], quantized_weights[8*i+5],
+            quantized_weights[8*i+6], quantized_weights[8*i+7]
+        );
     }
 
     // Calculate output data address (16 bytes per block)
@@ -969,7 +1063,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
     }
 
     // Next, columns
-    constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
+    constexpr unsigned int SHR_QUANT = 8;// + 6; // Quantize to 2b while storing
     for (unsigned int m = 0; m < w_out; ++m)
     {
         const unsigned int base_addr_i = m*h_inp;
@@ -1030,7 +1124,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
         _saturating_dot_acc_4u8(tmp8, wgt4, 0, &out4);
 
         addr_o += w_out;
-        out[addr_o] = (uint8_t)(out4 >> SHR_QUANT); // TODO: rounding
+        out[addr_o] = (uint8_t)(out4 >> SHR_QUANT);
     }
 }
 
@@ -1192,6 +1286,16 @@ void encode_block_int(
         downsample_12x12_to_8x5_u8_quant(
             ideal_weights,
             quantized_weights
+        );
+    }
+
+    for (int i = 0; i < 5; ++i)
+    {
+        LOGI("quant weights[%d]: %3d %3d %3d %3d %3d %3d %3d %3d\n", i,
+            quantized_weights[8*i+0], quantized_weights[8*i+1],
+            quantized_weights[8*i+2], quantized_weights[8*i+3],
+            quantized_weights[8*i+4], quantized_weights[8*i+5],
+            quantized_weights[8*i+6], quantized_weights[8*i+7]
         );
     }
 
