@@ -593,78 +593,19 @@ inline void downsample_12x12_to_8x5_u8_quant(
     constexpr unsigned int w_out = 8;
     constexpr unsigned int h_out = 5;
 
-    constexpr uint8x16_t BILIN_WEIGHTS_X_U8_0 = {
-        187, 111, 42,  0, 90,  30,  0, 71,  16,  0, 68,  0, 0, 0, 0, 0,
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_0 = {
+        187, 111,  42,  90,  30,  71,  16,  68,
     };
 
-    constexpr uint8x16_t BILIN_WEIGHTS_X_U8_1 = {
-         68, 128, 142, 0, 135, 135, 0, 142, 128, 0, 187, 0, 0, 0, 0, 0,
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_1 = {
+         68, 128, 142, 135, 135, 142, 128, 187,
     };
 
-    constexpr uint8x16_t BILIN_WEIGHTS_X_U8_2 = {
-          0, 16,  71,  0, 30,  90,  0, 42,  111, 0,   0, 0, 0, 0, 0, 0,
-    };
-
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_0_lo = {
-        187, 111, 42,  0, 90,  30,  0, 71,
-    };
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_0_hi = {
-         16,  0,   68,  0, 0,   0,   0, 0,
-    };
-
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_1_lo = {
-         68,  128, 142, 0, 135, 135, 0, 142,
-    };
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_1_hi = {
-        128, 0,   187, 0, 0,   0,   0, 0,
-    };
-
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_2_lo = {
-          0,   16,  71,  0, 30,  90,  0, 42,
-    };
-    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_2_hi = {
-        111, 0,   0,   0, 0,   0,   0, 0,
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_2 = {
+          0,  16,  71,  30,  90,  42, 111,  0,
     };
 
     constexpr uint8x8_t IDX_X = { 0, 1, 2, 4, 5, 7, 8, 10 };
-
-    // uint8x16_t test = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
-    // LOGI("test : %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
-    //     test[0], test[1], test[2], test[3], test[4], test[5], test[6], test[7],
-    //     test[8], test[9], test[10], test[11], test[12], test[13], test[14], test[15]
-    // );
-
-    // uint8x16_t test1 = vextq_u8(test, test, 1);
-    // LOGI("test1: %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
-    //     test1[0], test1[1], test1[2], test1[3], test1[4], test1[5], test1[6], test1[7],
-    //     test1[8], test1[9], test1[10], test1[11], test1[12], test1[13], test1[14], test1[15]
-    // );
-
-    // uint8x16_t test2 = vextq_u8(test, test, 2);
-    // LOGI("test2: %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
-    //     test2[0], test2[1], test2[2], test2[3], test2[4], test2[5], test2[6], test2[7],
-    //     test2[8], test2[9], test2[10], test2[11], test2[12], test2[13], test2[14], test2[15]
-    // );
-
-    // uint8x16_t idx = { 0, 1, 2, 4, 5, 7, 8, 10, 15, 15, 15, 15, 15, 15, 15, 15 };
-    // uint8x16_t test3 = vqtbl1q_u8(test, idx);
-    // LOGI("test3: %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
-    //     test3[0], test3[1], test3[2], test3[3], test3[4], test3[5], test3[6], test3[7],
-    //     test3[8], test3[9], test3[10], test3[11], test3[12], test3[13], test3[14], test3[15]
-    // );
-
-    // uint8x8_t test_lo = { 0, 1, 2,  3,  4,  5,  6,  7, };
-    // uint8x8_t test_hi = { 8, 9, 10, 11, 12, 13, 14, 15 };
-    // LOGI("test : %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
-    //     test_lo[0], test_lo[1], test_lo[2], test_lo[3], test_lo[4], test_lo[5], test_lo[6], test_lo[7],
-    //     test_hi[0], test_hi[1], test_hi[2], test_hi[3], test_hi[4], test_hi[5], test_hi[6], test_hi[7]
-    // );
-
-    // uint8x8_t test_res = vqtbl1_u8(test, IDX_X);
-    // LOGI("test : %2d %2d %2d %2d %2d %2d %2d %2d\n",
-    //     test_res[0], test_res[1], test_res[2], test_res[3],
-    //     test_res[4], test_res[5], test_res[6], test_res[7]
-    // );
 
     uint8x8_t tmp[h_inp];
 
@@ -673,46 +614,33 @@ inline void downsample_12x12_to_8x5_u8_quant(
     {
         // Align the input values so that 1st, 2nd and 3rd samples of the input
         // row are at the 0th position of row0/1/2
-        uint8x16_t row0 = vld1q_u8(inp + y*w_inp);
-        uint8x16_t row1 = vextq_u8(row0, row0, 1);
-        uint8x16_t row2 = vextq_u8(row0, row0, 2);
+        uint8x16_t row0_u16 = vld1q_u8(inp + y*w_inp);
+        uint8x16_t row1_u16 = vextq_u8(row0_u16, row0_u16, 1);
+        uint8x16_t row2_u16 = vextq_u8(row0_u16, row0_u16, 2);
 
-        // Split each row into two 8-byte vectors
-        uint8x8_t row0_lo = vget_low_u8(row0);
-        uint8x8_t row0_hi = vget_high_u8(row0);
-        uint8x8_t row1_lo = vget_low_u8(row1);
-        uint8x8_t row1_hi = vget_high_u8(row1);
-        uint8x8_t row2_lo = vget_low_u8(row2);
-        uint8x8_t row2_hi = vget_high_u8(row2);
+        // We calculate only 8 values => pack them into one 8-byte vector
+        uint8x8_t row0 = vqtbl1_u8(row0_u16, IDX_X);  // table select
+        uint8x8_t row1 = vqtbl1_u8(row1_u16, IDX_X);
+        uint8x8_t row2 = vqtbl1_u8(row2_u16, IDX_X);
 
         // Results storage
-        uint16x8_t res_lo = { 0 };
-        uint16x8_t res_hi = { 0 };
+        uint16x8_t res_u16 = { 0 };
 
         // Calculate the dot product by two multiply-adds
-        res_lo = vmlal_u8(res_lo, row0_lo, BILIN_WEIGHTS_X_U8_0_lo);
-        res_hi = vmlal_u8(res_hi, row0_hi, BILIN_WEIGHTS_X_U8_0_hi);
-        res_lo = vmlal_u8(res_lo, row1_lo, BILIN_WEIGHTS_X_U8_1_lo);
-        res_hi = vmlal_u8(res_hi, row1_hi, BILIN_WEIGHTS_X_U8_1_hi);
-        res_lo = vmlal_u8(res_lo, row2_lo, BILIN_WEIGHTS_X_U8_2_lo);
-        res_hi = vmlal_u8(res_hi, row2_hi, BILIN_WEIGHTS_X_U8_2_hi);
+        res_u16 = vmlal_u8(res_u16, row0, BILIN_WEIGHTS_X_U8_0);
+        res_u16 = vmlal_u8(res_u16, row1, BILIN_WEIGHTS_X_U8_1);
+        res_u16 = vmlal_u8(res_u16, row2, BILIN_WEIGHTS_X_U8_2);
 
         // Shift back from 16-bit to 8-bit precision
-        res_lo = vshrq_n_u16(res_lo, 8);
-        res_hi = vshrq_n_u16(res_hi, 8);
+        res_u16 = vshrq_n_u16(res_u16, 8);
 
         // Select results from the two parts and compose the final 8-byte vector
-        uint8x8_t res_lo_u8 = vmovn_u16(res_lo);
-        uint8x8_t res_hi_u8 = vmovn_u16(res_hi);
-        uint8x16_t res = vcombine_u8(res_lo_u8, res_hi_u8);
-        tmp[y] = vqtbl1_u8(res, IDX_X);  // table select
+        tmp[y] = vmovn_u16(res_u16);
 
         LOGI("tmp[%2d] : %3d %3d %3d %3d %3d %3d %3d %3d\n", y,
             tmp[y][0], tmp[y][1], tmp[y][2], tmp[y][3],
             tmp[y][4], tmp[y][5], tmp[y][6], tmp[y][7]
         );
-
-
     }
 }
 
