@@ -214,7 +214,6 @@ inline void _max_4u8(uchar4 px, uchar4 maxcol, uchar4* out)
 
 inline void _max_u32(uint32_t lhs, uint32_t rhs, uint32_t* out)
 {
-    ZoneScopedN("max_u32");
     *out = u32max(lhs, rhs);
 }
 
@@ -254,7 +253,6 @@ inline void _saturating_dot_acc_4u8(
 /* Unpack the first three elements of uchar4 vector into 32b array */
 inline void _unpack_rgb_u32(uchar4 v, uint32_t out[3])
 {
-    ZoneScopedN("unpack_rgb");
     out[0] = static_cast<uint32_t>(v.x);
     out[1] = static_cast<uint32_t>(v.y);
     out[2] = static_cast<uint32_t>(v.z);
@@ -371,8 +369,6 @@ inline uint32_t log2(uint32_t x)
   */
 inline uint32_t approx_inv_u32(uint32_t x)
 {
-    ZoneScopedN("approx_inv");
-
     // Useful constants
     constexpr unsigned int A = 0x0000F0F1;            // 32.0 / 17.0  Q2.15
     constexpr unsigned int B = 0xB4B4B4B5;            // 48.0 / 17.0  Q2.30
@@ -486,7 +482,6 @@ inline uint32_t approx_inv_u32(uint32_t x)
 /* Pack the first three elements of input 32b array into uchar4 vector */
 inline void pack_rgb_u8(uint32_t a[3], uchar4* out)
 {
-    ZoneScopedN("pack_rgb");
     out->x = (uint8_t)(a[0]);
     out->y = (uint8_t)(a[1]);
     out->z = (uint8_t)(a[2]);
@@ -588,6 +583,8 @@ inline void downsample_12x12_to_8x5_u8_quant(
     const uint8_t inp[BLOCK_PX_CNT + (16 - BLOCK_X)],
     uint8_t out[WGT_CNT]
 ){
+    ZoneScopedN("bilin");
+
     constexpr unsigned int w_inp = 12;
     constexpr unsigned int h_inp = 12;
     constexpr unsigned int w_out = 8;
@@ -861,7 +858,7 @@ void encode_block_int(
 
     // weights ISE encoding
     constexpr uint8_t wgt_bits = 2;
-    constexpr uint8_t wgt_byte_cnt = 10; // 40 * 2 / 8
+    constexpr uint8_t wgt_byte_cnt = 20 * wgt_bits / 8;
     unsigned int j = 0;
     for (unsigned int i = 0; i < WGT_CNT; i += 4)
     {
@@ -872,9 +869,6 @@ void encode_block_int(
         res |= (wgt >> 6) & 0x0c;
         res |= (wgt >> 12) & 0x30;
         res |= (wgt >> 18) & 0xc0;
-
-        //debug
-        //_TCE_ST8(TEST+j, res);
 
         wgt_buf[j++] = res;
     }
@@ -980,7 +974,7 @@ inline void downsample_12x12_to_8x5_u8_quant(
     const uint8_t inp[BLOCK_PX_CNT],
     uint8_t out[WGT_CNT]
 ){
-    ZoneScopedN("downsample");
+    ZoneScopedN("bilin");
 
     constexpr unsigned int w_inp = 12;
     constexpr unsigned int h_inp = 12;
@@ -1227,6 +1221,8 @@ void encode_block_int(
 
     if (*as_u32(&mincol_quant) != *as_u32(&maxcol_quant))
     {
+        ZoneScopedN("px_map");
+
         // Projection of pixels onto ep_vec to get the ideal weights
         // First, we normalize the endpoint vector and scale it.
         uint32_t ep_dot;     // Q2.16
@@ -1285,23 +1281,20 @@ void encode_block_int(
         // downsampling
         uint8_t ideal_weights[BLOCK_PX_CNT];
 
+        for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
         {
-            ZoneScopedN("px_map");
-            for (unsigned int i = 0; i < BLOCK_PX_CNT; ++i)
-            {
-                uchar4 diff;
-                _saturating_sub_4u8(block_pixels[i], mincol, &diff);
+            uchar4 diff;
+            _saturating_sub_4u8(block_pixels[i], mincol, &diff);
 
-                // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
-                // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
-                // recover lost precision by adding one
-                uint32_t res;
-                _saturating_dot_acc_4u8(diff, ep_sc8, one, &res);
-                ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
+            // dot product max: Q5.3 * Q0.8 + 3xADD = Q8.11 -> sat 5.11 (0.11)
+            // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
+            // recover lost precision by adding one
+            uint32_t res;
+            _saturating_dot_acc_4u8(diff, ep_sc8, one, &res);
+            ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
 
-                // printf("dot[%3d] : %6d\n", i, res);
-                // printf("iwgt[%3d] : %#04x\n", i, ideal_weights[i]);
-            }
+            // printf("dot[%3d] : %6d\n", i, res);
+            // printf("iwgt[%3d] : %#04x\n", i, ideal_weights[i]);
         }
 
         downsample_12x12_to_8x5_u8_quant(
