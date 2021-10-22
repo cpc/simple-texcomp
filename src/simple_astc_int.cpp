@@ -492,6 +492,432 @@ inline void pack_rgb_u8(uint32_t a[3], uchar4* out)
     out->z = (uint8_t)(a[2]);
 }
 
+#ifdef ANDROID
+
+inline void read_block_min_max(
+    const uint8_t* __restrict__ inp,
+    unsigned int block_id_x,
+    unsigned int block_id_y,
+    unsigned int img_w,
+    uchar4* mincol,
+    uchar4* maxcol,
+    uint8x16_t block_pixels_x4[36]  // 36 == 12 * 3 == 9 * 4
+) {
+    ZoneScopedN("minmax");
+
+    unsigned int xb = block_id_x * BLOCK_X;
+    unsigned int yb = block_id_y * BLOCK_Y;
+
+    // Color endpoints - min and max colors in the current block
+    uint8x16_t min_x4 = {
+        255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255
+    };
+    uint8x16_t max_x4 = {
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
+
+    for (unsigned int y = 0; y < BLOCK_Y; ++y)
+    {
+        const unsigned int off = img_w * (yb + y) + xb;
+
+        uint8x16_t r = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
+        uint8x16_t g = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
+        uint8x16_t b = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
+
+        min_x4 = vminq_u8(min_x4, r);
+        min_x4 = vminq_u8(min_x4, g);
+        min_x4 = vminq_u8(min_x4, b);
+
+        max_x4 = vmaxq_u8(max_x4, r);
+        max_x4 = vmaxq_u8(max_x4, g);
+        max_x4 = vmaxq_u8(max_x4, b);
+
+        block_pixels_x4[3*y+0] = r;
+        block_pixels_x4[3*y+1] = g;
+        block_pixels_x4[3*y+2] = b;
+    }
+
+    const uint8x16_t mask_min_r_x4 = {
+        0,   255, 255, 255, 0,   255, 255, 255,
+        0,   255, 255, 255, 0,   255, 255, 255
+    };
+    const uint8x16_t mask_min_g_x4 = {
+        255, 0,   255, 255, 255, 0,   255, 255,
+        255, 0,   255, 255, 255, 0,   255, 255
+    };
+    const uint8x16_t mask_min_b_x4 = {
+        255, 255, 0,   255, 255, 255, 0,   255,
+        255, 255, 0,   255, 255, 255, 0,   255
+    };
+
+    const uint8x16_t mask_max_r_x4 = {
+        255, 0,   0,   0,   255, 0,   0,   0,
+        255, 0,   0,   0,   255, 0,   0,   0
+    };
+    const uint8x16_t mask_max_g_x4 = {
+        0,   255, 0,   0,   0,   255, 0,   0,
+        0,   255, 0,   0,   0,   255, 0,   0
+    };
+    const uint8x16_t mask_max_b_x4 = {
+        0,   0,   255, 0,   0,   0,   255, 0,
+        0,   0,   255, 0,   0,   0,   255, 0
+    };
+
+    const uint8x16_t min_r_x4 = vorrq_u8(min_x4, mask_min_r_x4);
+    const uint8x16_t min_g_x4 = vorrq_u8(min_x4, mask_min_g_x4);
+    const uint8x16_t min_b_x4 = vorrq_u8(min_x4, mask_min_b_x4);
+
+    const uint8x16_t max_r_x4 = vandq_u8(max_x4, mask_max_r_x4);
+    const uint8x16_t max_g_x4 = vandq_u8(max_x4, mask_max_g_x4);
+    const uint8x16_t max_b_x4 = vandq_u8(max_x4, mask_max_b_x4);
+
+    const uint8_t min_r = vminvq_u8(min_r_x4);  // requires A64
+    const uint8_t min_g = vminvq_u8(min_g_x4);  // requires A64
+    const uint8_t min_b = vminvq_u8(min_b_x4);  // requires A64
+
+    const uint8_t max_r = vmaxvq_u8(max_r_x4);  // requires A64
+    const uint8_t max_g = vmaxvq_u8(max_g_x4);  // requires A64
+    const uint8_t max_b = vmaxvq_u8(max_b_x4);  // requires A64
+
+    *mincol = uchar4 { min_r, min_g, min_b, 255 };
+    *maxcol = uchar4 { max_r, max_g, max_b, 255 };
+}
+
+inline void downsample_12x12_to_8x5_u8_quant(
+    const uint8_t inp[BLOCK_PX_CNT],
+    uint8_t out[WGT_CNT]
+){
+    constexpr unsigned int w_inp = 12;
+    constexpr unsigned int h_inp = 12;
+    constexpr unsigned int w_out = 8;
+    constexpr unsigned int h_out = 5;
+
+    constexpr uint8x16_t BILIN_WEIGHTS_X_U8_0 = {
+        187, 111, 42,  0, 90,  30,  0, 71,  16,  0, 68,  0, 0, 0, 0, 0,
+    };
+
+    constexpr uint8x16_t BILIN_WEIGHTS_X_U8_1 = {
+         68, 128, 142, 0, 135, 135, 0, 142, 128, 0, 187, 0, 0, 0, 0, 0,
+    };
+
+    constexpr uint8x16_t BILIN_WEIGHTS_X_U8_2 = {
+          0, 16,  71,  0, 30,  90,  0, 42,  111, 0,   0, 0, 0, 0, 0, 0,
+    };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_0_lo = {
+        187, 111, 42,  0, 90,  30,  0, 71,
+    };
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_0_hi = {
+         16,  0,   68,  0, 0,   0,   0, 0,
+    };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_1_lo = {
+         68,  128, 142, 0, 135, 135, 0, 142,
+    };
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_1_hi = {
+        128, 0,   187, 0, 0,   0,   0, 0,
+    };
+
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_2_lo = {
+          0,   16,  71,  0, 30,  90,  0, 42,
+    };
+    constexpr uint8x8_t BILIN_WEIGHTS_X_U8_2_hi = {
+        111, 0,   0,   0, 0,   0,   0, 0,
+    };
+
+    constexpr uint8x8_t IDX_X = { 0, 1, 2, 4, 5, 7, 8, 10 };
+
+    // uint8x16_t test = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+    // LOGI("test : %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
+    //     test[0], test[1], test[2], test[3], test[4], test[5], test[6], test[7],
+    //     test[8], test[9], test[10], test[11], test[12], test[13], test[14], test[15]
+    // );
+
+    // uint8x16_t test1 = vextq_u8(test, test, 1);
+    // LOGI("test1: %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
+    //     test1[0], test1[1], test1[2], test1[3], test1[4], test1[5], test1[6], test1[7],
+    //     test1[8], test1[9], test1[10], test1[11], test1[12], test1[13], test1[14], test1[15]
+    // );
+
+    // uint8x16_t test2 = vextq_u8(test, test, 2);
+    // LOGI("test2: %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
+    //     test2[0], test2[1], test2[2], test2[3], test2[4], test2[5], test2[6], test2[7],
+    //     test2[8], test2[9], test2[10], test2[11], test2[12], test2[13], test2[14], test2[15]
+    // );
+
+    // uint8x16_t idx = { 0, 1, 2, 4, 5, 7, 8, 10, 15, 15, 15, 15, 15, 15, 15, 15 };
+    // uint8x16_t test3 = vqtbl1q_u8(test, idx);
+    // LOGI("test3: %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
+    //     test3[0], test3[1], test3[2], test3[3], test3[4], test3[5], test3[6], test3[7],
+    //     test3[8], test3[9], test3[10], test3[11], test3[12], test3[13], test3[14], test3[15]
+    // );
+
+    // uint8x8_t test_lo = { 0, 1, 2,  3,  4,  5,  6,  7, };
+    // uint8x8_t test_hi = { 8, 9, 10, 11, 12, 13, 14, 15 };
+    // LOGI("test : %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d %2d\n",
+    //     test_lo[0], test_lo[1], test_lo[2], test_lo[3], test_lo[4], test_lo[5], test_lo[6], test_lo[7],
+    //     test_hi[0], test_hi[1], test_hi[2], test_hi[3], test_hi[4], test_hi[5], test_hi[6], test_hi[7]
+    // );
+
+    // uint8x8_t test_res = vqtbl1_u8(test, IDX_X);
+    // LOGI("test : %2d %2d %2d %2d %2d %2d %2d %2d\n",
+    //     test_res[0], test_res[1], test_res[2], test_res[3],
+    //     test_res[4], test_res[5], test_res[6], test_res[7]
+    // );
+
+    uint8x8_t tmp[h_inp];
+
+    // First, interpolate rows.
+    for (unsigned int y = 0; y < h_inp; ++y)
+    {
+        // Align the input values so that 1st, 2nd and 3rd samples of the input
+        // row are at the 0th position of row0/1/2
+        uint8x16_t row0 = vld1q_u8(inp + y*w_inp);
+        uint8x16_t row1 = vextq_u8(row0, row0, 1);
+        uint8x16_t row2 = vextq_u8(row0, row0, 2);
+
+        // Split each row into two 8-byte vectors
+        uint8x8_t row0_lo = vget_low_u8(row0);
+        uint8x8_t row0_hi = vget_high_u8(row0);
+        uint8x8_t row1_lo = vget_low_u8(row1);
+        uint8x8_t row1_hi = vget_high_u8(row1);
+        uint8x8_t row2_lo = vget_low_u8(row2);
+        uint8x8_t row2_hi = vget_high_u8(row2);
+
+        // Results storage
+        uint16x8_t res_lo = { 0 };
+        uint16x8_t res_hi = { 0 };
+
+        // Calculate the dot product by two multiply-adds
+        res_lo = vmlal_u8(res_lo, row0_lo, BILIN_WEIGHTS_X_U8_0_lo);
+        res_hi = vmlal_u8(res_hi, row0_hi, BILIN_WEIGHTS_X_U8_0_hi);
+        res_lo = vmlal_u8(res_lo, row1_lo, BILIN_WEIGHTS_X_U8_1_lo);
+        res_hi = vmlal_u8(res_hi, row1_hi, BILIN_WEIGHTS_X_U8_1_hi);
+        res_lo = vmlal_u8(res_lo, row2_lo, BILIN_WEIGHTS_X_U8_2_lo);
+        res_hi = vmlal_u8(res_hi, row2_hi, BILIN_WEIGHTS_X_U8_2_hi);
+
+        // Shift back from 16-bit to 8-bit precision
+        res_lo = vshrq_n_u16(res_lo, 8);
+        res_hi = vshrq_n_u16(res_hi, 8);
+
+        // Select results from the two parts and compose the final 8-byte vector
+        uint8x8_t res_lo_u8 = vmovn_u16(res_lo);
+        uint8x8_t res_hi_u8 = vmovn_u16(res_hi);
+        uint8x16_t res = vcombine_u8(res_lo_u8, res_hi_u8);
+        tmp[y] = vqtbl1_u8(res, IDX_X);  // table select
+
+        LOGI("tmp[%2d] : %3d %3d %3d %3d %3d %3d %3d %3d\n", y,
+            tmp[y][0], tmp[y][1], tmp[y][2], tmp[y][3],
+            tmp[y][4], tmp[y][5], tmp[y][6], tmp[y][7]
+        );
+
+
+    }
+}
+
+void encode_block_int(
+    const uint8_t* __restrict__ inp_img,
+    unsigned int block_id_x,
+    unsigned int block_id_y,
+    unsigned int img_w,
+    uint8_t* __restrict__ out_data
+){
+    ZoneScopedN("enc_blk_astc");
+
+    // Number of blocks in x-direction
+    const unsigned int NB_X = img_w / BLOCK_X;
+
+    // Input pixel block as 1D array & min/max pixel values
+    uint8x16_t block_pixels_x4[BLOCK_PX_CNT / 4];
+    uchar4 mincol, maxcol;
+
+    // Read pixel block into a 1D array and select min/max at the same time
+    read_block_min_max(
+        inp_img,
+        block_id_x,
+        block_id_y,
+        img_w,
+        &mincol,
+        &maxcol,
+        block_pixels_x4
+    );
+
+    // Move the endpoints line segment such that mincol is at zero
+    uchar4 ep_vec;
+    _saturating_sub_4u8(maxcol, mincol, &ep_vec);
+
+    // Inset min/max (shrink the bounding box to reduce the effect of outliers)
+    const uchar4 inset = ep_vec >> 5;
+    mincol = mincol + inset;
+    maxcol = maxcol - inset;
+
+    // Quantize the endpoints
+    const uchar4 mincol_quant = quantize_5b(&mincol);
+    const uchar4 maxcol_quant = quantize_5b(&maxcol);
+
+    // Pixels quantized as 2b weights
+    uint8_t quantized_weights[WGT_CNT] = { 0 };
+
+    if (*as_u32(&mincol_quant) != *as_u32(&maxcol_quant))
+    {
+        ZoneScopedN("px_map");
+
+        // Projection of pixels onto ep_vec to get the ideal weights
+        // First, we normalize the endpoint vector and scale it.
+        uint32_t ep_dot;     // Q2.16
+        _saturating_dot_acc_4u8(ep_vec, ep_vec, 0, &ep_dot);
+
+        // Q10.22, max. value 1024 for 5b quant
+        const uint32_t inv_ep_dot = approx_inv_u32(ep_dot);
+
+        // printf("ep_dot: %#010x\n", ep_dot);
+        // printf("inv   : %#010x\n", inv_ep_dot);
+
+        // The scaled ep_vec can be max. 32 due to 5b quantization
+        uint32_t ep_vec32[3];
+        _unpack_rgb_u32(ep_vec, ep_vec32);
+
+        uint32_t ep_sc32[3] = {
+            ep_vec32[0] * (inv_ep_dot >> 8),  // Q0.8 * Q10.14 = Q10.22
+            ep_vec32[1] * (inv_ep_dot >> 8),
+            ep_vec32[2] * (inv_ep_dot >> 8),
+        };
+
+        // Scaling the endpoint vector to fit 8 bits. The Q representation
+        // depends on the magnitude of the division result above: between Q5.3
+        // and Q0.8.
+        const uint32_t log2ep[3] = {
+            log2(ep_sc32[0]),
+            log2(ep_sc32[1]),
+            log2(ep_sc32[2]),
+        };
+
+        uint32_t sc;
+        _max_u32(log2ep[0], log2ep[1], &sc);
+        _max_u32(log2ep[2], sc, &sc);
+        const uint32_t q_int = sc >= 21 ? sc - 21 : 0; // no. integer bits
+        const uint32_t shr = 14 + q_int;               // how much to rshift
+
+        ep_sc32[0] >>= shr;
+        ep_sc32[1] >>= shr;
+        ep_sc32[2] >>= shr;
+
+        uchar4 ep_sc8;
+        pack_rgb_u8(ep_sc32, &ep_sc8);
+
+        // One (almost), represented in the variable Q format.
+        const uint32_t shr_res = 8 - q_int;
+        const uint32_t one = (1 << shr_res) - 1;
+
+        // vector types
+        uint8x16_t mincol_x4 = {
+            mincol.x, mincol.y, mincol.z, mincol.w,
+            mincol.x, mincol.y, mincol.z, mincol.w,
+            mincol.x, mincol.y, mincol.z, mincol.w,
+            mincol.x, mincol.y, mincol.z, mincol.w,
+        };
+
+        uint32x4_t one_x4 = { one, one, one, one };
+
+        uint8x16_t ep_sc8_x4 = {
+            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
+            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
+            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
+            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
+        };
+
+        int32x4_t shl_res_x4 {
+            -(int32_t)(shr_res),
+            -(int32_t)(shr_res),
+            -(int32_t)(shr_res),
+            -(int32_t)(shr_res)
+        };
+
+        uint8_t ideal_weights[BLOCK_PX_CNT];
+
+        for (unsigned int i = 0; i < BLOCK_PX_CNT / 4; ++i)
+        {
+            uint8x16_t diff_x4 = vqsubq_u8(block_pixels_x4[i], mincol_x4);
+            // Requires UDOT instruction. Apparently, -march=armv8.4-a is needed
+            // as well.
+            uint32x4_t dot_x4 = vdotq_u32(one_x4, diff_x4, ep_sc8_x4);
+
+            // LOGI("dot[%3d]: %6d\n", 4*i+0, dot_x4[0]);
+            // LOGI("dot[%3d]: %6d\n", 4*i+1, dot_x4[1]);
+            // LOGI("dot[%3d]: %6d\n", 4*i+2, dot_x4[2]);
+            // LOGI("dot[%3d]: %6d\n", 4*i+3, dot_x4[3]);
+
+            uint32x4_t res_x4 = vshlq_u32(dot_x4, shl_res_x4);
+
+            ideal_weights[4*i+0] = (uint8_t)(res_x4[0]);
+            ideal_weights[4*i+1] = (uint8_t)(res_x4[1]);
+            ideal_weights[4*i+2] = (uint8_t)(res_x4[2]);
+            ideal_weights[4*i+3] = (uint8_t)(res_x4[3]);
+
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+0, ideal_weights[4*i+0]);
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+1, ideal_weights[4*i+1]);
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+2, ideal_weights[4*i+2]);
+            // LOGI("iwgt[%3d]: %#04x\n", 4*i+3, ideal_weights[4*i+3]);
+        }
+
+        downsample_12x12_to_8x5_u8_quant(ideal_weights, quantized_weights);
+    }
+
+    // Calculate output data address (16 bytes per block)
+    // out_data = out_data + ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP);
+
+    // for (unsigned int i = 0; i < BLOCK_SIZE; i += 4)
+    // {
+    //     out_data[i] = ideal_weights[i];
+    // }
+}
+
+#else // ANDROID
+
+/** Read one block from the input image and calculate its min/max values
+ */
+inline void read_block_min_max(
+    const uint8_t* __restrict__ inp,
+    unsigned int block_id_x,
+    unsigned int block_id_y,
+    unsigned int img_w,
+    uchar4* mincol,
+    uchar4* maxcol,
+    uchar4 block_pixels[BLOCK_PX_CNT]
+) {
+    ZoneScopedN("minmax");
+
+    unsigned int xb = block_id_x * BLOCK_X;
+    unsigned int yb = block_id_y * BLOCK_Y;
+
+    // Color endpoints - min and max colors in the current block
+    uchar4 _mincol = { 255, 255, 255, 255 };
+    uchar4 _maxcol = { 0, 0, 0, 0 };
+
+    for (unsigned int y = 0; y < BLOCK_Y; ++y)
+    {
+        const unsigned int off = img_w * (yb + y) + xb;
+
+        for (unsigned int x = 0; x < BLOCK_X; ++x)
+        {
+            const unsigned int i_inp = (off + x) << 2; // assuming NCH_RGB = 4
+            const unsigned int i_out = y*BLOCK_X + x;
+
+            uchar4 px;
+            _load_4u8(inp+i_inp, &px);
+
+            _min_4u8(px, _mincol, &_mincol);
+            _max_4u8(px, _maxcol, &_maxcol);
+
+            block_pixels[i_out] = px;
+        }
+    }
+
+    *mincol = _mincol;
+    *maxcol = _maxcol;
+}
+
 /** Downsample 12x12 block into 8x5 using bilinear filtering and quantize it
  *
  * The inp/out grid size is fixed and one channel per sample is assumed.
@@ -604,6 +1030,16 @@ inline void downsample_12x12_to_8x5_u8_quant(
         tmp[addr_o] = (uint8_t)(out7 >> 8);
     }
 
+    for (int i = 0; i < 12; ++i) {
+        LOGI("tmp[%2d] : %3d %3d %3d %3d %3d %3d %3d %3d\n", i,
+        //     tmp[8*i+0], tmp[8*i+1], tmp[8*i+2], tmp[8*i+3],
+        //     tmp[8*i+4], tmp[8*i+5], tmp[8*i+6], tmp[8*i+7]
+        // );
+            tmp[12*0+i], tmp[12*1+i], tmp[12*2+i], tmp[12*3+i],
+            tmp[12*4+i], tmp[12*5+i], tmp[12*6+i], tmp[12*7+i]
+        );
+    }
+
     // Next, columns
     constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
     for (unsigned int m = 0; m < w_out; ++m)
@@ -668,298 +1104,6 @@ inline void downsample_12x12_to_8x5_u8_quant(
         addr_o += w_out;
         out[addr_o] = (uint8_t)(out4 >> SHR_QUANT); // TODO: rounding
     }
-}
-
-/** Read one block from the input image and calculate its min/max values
- */
-#ifdef ANDROID
-
-inline void read_block_min_max(
-    const uint8_t* __restrict__ inp,
-    unsigned int block_id_x,
-    unsigned int block_id_y,
-    unsigned int img_w,
-    uchar4* mincol,
-    uchar4* maxcol,
-    uint8x16_t block_pixels_x4[36]  // 36 == 12 * 3 == 9 * 4
-) {
-    ZoneScopedN("minmax");
-
-    unsigned int xb = block_id_x * BLOCK_X;
-    unsigned int yb = block_id_y * BLOCK_Y;
-
-    // Color endpoints - min and max colors in the current block
-    uint8x16_t min_x4 = {
-        255, 255, 255, 255, 255, 255, 255, 255,
-        255, 255, 255, 255, 255, 255, 255, 255
-    };
-    uint8x16_t max_x4 = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    };
-
-    for (unsigned int y = 0; y < BLOCK_Y; ++y)
-    {
-        const unsigned int off = img_w * (yb + y) + xb;
-
-        uint8x16_t r = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
-        uint8x16_t g = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
-        uint8x16_t b = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
-
-        min_x4 = vminq_u8(min_x4, r);
-        min_x4 = vminq_u8(min_x4, g);
-        min_x4 = vminq_u8(min_x4, b);
-
-        max_x4 = vmaxq_u8(max_x4, r);
-        max_x4 = vmaxq_u8(max_x4, g);
-        max_x4 = vmaxq_u8(max_x4, b);
-
-        block_pixels_x4[3*y+0] = r;
-        block_pixels_x4[3*y+1] = g;
-        block_pixels_x4[3*y+2] = b;
-    }
-
-    const uint8x16_t mask_min_r_x4 = {
-        0,   255, 255, 255, 0,   255, 255, 255,
-        0,   255, 255, 255, 0,   255, 255, 255
-    };
-    const uint8x16_t mask_min_g_x4 = {
-        255, 0,   255, 255, 255, 0,   255, 255,
-        255, 0,   255, 255, 255, 0,   255, 255
-    };
-    const uint8x16_t mask_min_b_x4 = {
-        255, 255, 0,   255, 255, 255, 0,   255,
-        255, 255, 0,   255, 255, 255, 0,   255
-    };
-
-    const uint8x16_t mask_max_r_x4 = {
-        255, 0,   0,   0,   255, 0,   0,   0,
-        255, 0,   0,   0,   255, 0,   0,   0
-    };
-    const uint8x16_t mask_max_g_x4 = {
-        0,   255, 0,   0,   0,   255, 0,   0,
-        0,   255, 0,   0,   0,   255, 0,   0
-    };
-    const uint8x16_t mask_max_b_x4 = {
-        0,   0,   255, 0,   0,   0,   255, 0,
-        0,   0,   255, 0,   0,   0,   255, 0
-    };
-
-    const uint8x16_t min_r_x4 = vorrq_u8(min_x4, mask_min_r_x4);
-    const uint8x16_t min_g_x4 = vorrq_u8(min_x4, mask_min_g_x4);
-    const uint8x16_t min_b_x4 = vorrq_u8(min_x4, mask_min_b_x4);
-
-    const uint8x16_t max_r_x4 = vandq_u8(max_x4, mask_max_r_x4);
-    const uint8x16_t max_g_x4 = vandq_u8(max_x4, mask_max_g_x4);
-    const uint8x16_t max_b_x4 = vandq_u8(max_x4, mask_max_b_x4);
-
-    const uint8_t min_r = vminvq_u8(min_r_x4);  // requires A64
-    const uint8_t min_g = vminvq_u8(min_g_x4);  // requires A64
-    const uint8_t min_b = vminvq_u8(min_b_x4);  // requires A64
-
-    const uint8_t max_r = vmaxvq_u8(max_r_x4);  // requires A64
-    const uint8_t max_g = vmaxvq_u8(max_g_x4);  // requires A64
-    const uint8_t max_b = vmaxvq_u8(max_b_x4);  // requires A64
-
-    *mincol = uchar4 { min_r, min_g, min_b, 255 };
-    *maxcol = uchar4 { max_r, max_g, max_b, 255 };
-}
-
-void encode_block_int(
-    const uint8_t* __restrict__ inp_img,
-    unsigned int block_id_x,
-    unsigned int block_id_y,
-    unsigned int img_w,
-    uint8_t* __restrict__ out_data
-){
-    ZoneScopedN("enc_blk_astc");
-
-    // Number of blocks in x-direction
-    const unsigned int NB_X = img_w / BLOCK_X;
-
-    // Input pixel block as 1D array & min/max pixel values
-    uint8x16_t block_pixels_x4[BLOCK_PX_CNT / 4];
-    uchar4 mincol, maxcol;
-
-    // Read pixel block into a 1D array and select min/max at the same time
-    read_block_min_max(
-        inp_img,
-        block_id_x,
-        block_id_y,
-        img_w,
-        &mincol,
-        &maxcol,
-        block_pixels_x4
-    );
-
-    // Move the endpoints line segment such that mincol is at zero
-    uchar4 ep_vec;
-    _saturating_sub_4u8(maxcol, mincol, &ep_vec);
-
-    // Inset min/max (shrink the bounding box to reduce the effect of outliers)
-    const uchar4 inset = ep_vec >> 5;
-    mincol = mincol + inset;
-    maxcol = maxcol - inset;
-
-    // Quantize the endpoints
-    const uchar4 mincol_quant = quantize_5b(&mincol);
-    const uchar4 maxcol_quant = quantize_5b(&maxcol);
-
-    // Pixels quantized as 2b weights
-    uint8_t quantized_weights[WGT_CNT] = { 0 };
-
-    if (*as_u32(&mincol_quant) != *as_u32(&maxcol_quant))
-    {
-        ZoneScopedN("px_map");
-
-        // Projection of pixels onto ep_vec to get the ideal weights
-        // First, we normalize the endpoint vector and scale it.
-        uint32_t ep_dot;     // Q2.16
-        _saturating_dot_acc_4u8(ep_vec, ep_vec, 0, &ep_dot);
-
-        // Q10.22, max. value 1024 for 5b quant
-        const uint32_t inv_ep_dot = approx_inv_u32(ep_dot);
-
-        // printf("ep_dot: %#010x\n", ep_dot);
-        // printf("inv   : %#010x\n", inv_ep_dot);
-
-        // The scaled ep_vec can be max. 32 due to 5b quantization
-        uint32_t ep_vec32[3];
-        _unpack_rgb_u32(ep_vec, ep_vec32);
-
-        uint32_t ep_sc32[3] = {
-            ep_vec32[0] * (inv_ep_dot >> 8),  // Q0.8 * Q10.14 = Q10.22
-            ep_vec32[1] * (inv_ep_dot >> 8),
-            ep_vec32[2] * (inv_ep_dot >> 8),
-        };
-
-        // Scaling the endpoint vector to fit 8 bits. The Q representation
-        // depends on the magnitude of the division result above: between Q5.3
-        // and Q0.8.
-        const uint32_t log2ep[3] = {
-            log2(ep_sc32[0]),
-            log2(ep_sc32[1]),
-            log2(ep_sc32[2]),
-        };
-
-        uint32_t sc;
-        _max_u32(log2ep[0], log2ep[1], &sc);
-        _max_u32(log2ep[2], sc, &sc);
-        const uint32_t q_int = sc >= 21 ? sc - 21 : 0; // no. integer bits
-        const uint32_t shr = 14 + q_int;               // how much to rshift
-
-        ep_sc32[0] >>= shr;
-        ep_sc32[1] >>= shr;
-        ep_sc32[2] >>= shr;
-
-        uchar4 ep_sc8;
-        pack_rgb_u8(ep_sc32, &ep_sc8);
-
-        // One (almost), represented in the variable Q format.
-        const uint32_t shr_res = 8 - q_int;
-        const uint32_t one = (1 << shr_res) - 1;
-
-        uint8_t ideal_weights[BLOCK_PX_CNT];
-
-        // vector types
-        uint8x16_t mincol_x4 = {
-            mincol.x, mincol.y, mincol.z, mincol.w,
-            mincol.x, mincol.y, mincol.z, mincol.w,
-            mincol.x, mincol.y, mincol.z, mincol.w,
-            mincol.x, mincol.y, mincol.z, mincol.w,
-        };
-
-        uint32x4_t one_x4 = { one, one, one, one };
-
-        uint8x16_t ep_sc8_x4 = {
-            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
-            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
-            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
-            ep_sc8.x, ep_sc8.y, ep_sc8.z, ep_sc8.w,
-        };
-
-        int32x4_t shl_res_x4 {
-            -(int32_t)(shr_res),
-            -(int32_t)(shr_res),
-            -(int32_t)(shr_res),
-            -(int32_t)(shr_res)
-        };
-
-        for (unsigned int i = 0; i < BLOCK_PX_CNT / 4; ++i)
-        {
-            uint8x16_t diff_x4 = vqsubq_u8(block_pixels_x4[i], mincol_x4);
-            // Requires UDOT instruction. Apparently, -march=armv8.4-a is needed
-            // as well.
-            uint32x4_t dot_x4 = vdotq_u32(one_x4, diff_x4, ep_sc8_x4);
-
-            // LOGI("dot[%3d]: %6d\n", 4*i+0, dot_x4[0]);
-            // LOGI("dot[%3d]: %6d\n", 4*i+1, dot_x4[1]);
-            // LOGI("dot[%3d]: %6d\n", 4*i+2, dot_x4[2]);
-            // LOGI("dot[%3d]: %6d\n", 4*i+3, dot_x4[3]);
-
-            uint32x4_t res_x4 = vshlq_u32(dot_x4, shl_res_x4);
-
-            ideal_weights[4*i+0] = (uint8_t)(res_x4[0]);
-            ideal_weights[4*i+1] = (uint8_t)(res_x4[1]);
-            ideal_weights[4*i+2] = (uint8_t)(res_x4[2]);
-            ideal_weights[4*i+3] = (uint8_t)(res_x4[3]);
-
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+0, ideal_weights[4*i+0]);
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+1, ideal_weights[4*i+1]);
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+2, ideal_weights[4*i+2]);
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+3, ideal_weights[4*i+3]);
-        }
-    }
-
-    // Calculate output data address (16 bytes per block)
-    out_data = out_data + ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP);
-
-    for (unsigned int i = 0; i < BLOCK_SIZE; i += 4)
-    {
-        out_data[i] = 0;
-    }
-}
-
-#else // ANDROID
-
-inline void read_block_min_max(
-    const uint8_t* __restrict__ inp,
-    unsigned int block_id_x,
-    unsigned int block_id_y,
-    unsigned int img_w,
-    uchar4* mincol,
-    uchar4* maxcol,
-    uchar4 block_pixels[BLOCK_PX_CNT]
-) {
-    ZoneScopedN("minmax");
-
-    unsigned int xb = block_id_x * BLOCK_X;
-    unsigned int yb = block_id_y * BLOCK_Y;
-
-    // Color endpoints - min and max colors in the current block
-    uchar4 _mincol = { 255, 255, 255, 255 };
-    uchar4 _maxcol = { 0, 0, 0, 0 };
-
-    for (unsigned int y = 0; y < BLOCK_Y; ++y)
-    {
-        const unsigned int off = img_w * (yb + y) + xb;
-
-        for (unsigned int x = 0; x < BLOCK_X; ++x)
-        {
-            const unsigned int i_inp = (off + x) << 2; // assuming NCH_RGB = 4
-            const unsigned int i_out = y*BLOCK_X + x;
-
-            uchar4 px;
-            _load_4u8(inp+i_inp, &px);
-
-            _min_4u8(px, _mincol, &_mincol);
-            _max_4u8(px, _maxcol, &_maxcol);
-
-            block_pixels[i_out] = px;
-        }
-    }
-
-    *mincol = _mincol;
-    *maxcol = _maxcol;
 }
 
 /** Encode a block of pixels
