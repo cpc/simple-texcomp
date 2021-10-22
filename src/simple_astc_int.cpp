@@ -856,13 +856,74 @@ void encode_block_int(
         downsample_12x12_to_8x5_u8_quant(ideal_weights, quantized_weights);
     }
 
-    // Calculate output data address (16 bytes per block)
-    // out_data = out_data + ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP);
+    // Output buffer for quantized weights and output data
+	uint8_t wgt_buf[BLOCK_SIZE] = { 0 };
 
-    // for (unsigned int i = 0; i < BLOCK_SIZE; i += 4)
-    // {
-    //     out_data[i] = ideal_weights[i];
-    // }
+    // weights ISE encoding
+    constexpr uint8_t wgt_bits = 2;
+    constexpr uint8_t wgt_byte_cnt = 10; // 40 * 2 / 8
+    unsigned int j = 0;
+    for (unsigned int i = 0; i < WGT_CNT; i += 4)
+    {
+        uint32_t wgt;
+        _load_u32(quantized_weights + i , &wgt);
+
+        uint8_t res = wgt & 0x03;
+        res |= (wgt >> 6) & 0x0c;
+        res |= (wgt >> 12) & 0x30;
+        res |= (wgt >> 18) & 0xc0;
+
+        //debug
+        //_TCE_ST8(TEST+j, res);
+
+        wgt_buf[j++] = res;
+    }
+
+    // Calculate output data address (16 bytes per block)
+    out_data = out_data + ((block_id_y*NB_X + block_id_x) << BLOCK_SIZE_EXP);
+
+    // write out weights
+    for (unsigned int i = 0; i < BLOCK_SIZE; i += 4)
+    {
+        uint32_t wgt4 = *(uint32_t*)(&wgt_buf[12 - i]);
+        uint32_t reflected;
+        _reflect_u32(wgt4, &reflected);
+        _store_u32(&out_data[i], reflected);
+    }
+
+    // write out mode, partition, CEM
+    constexpr uint16_t block_mode = 102;
+    _write_bits(block_mode, 11, 0, out_data);
+    constexpr unsigned int partition_count = 1;
+    _write_bits(partition_count - 1, 2, 11, out_data);
+    constexpr unsigned int color_format = 8;
+    _write_bits(color_format, 4, 13, out_data);
+
+    // quantized endpoint output data (layout is R0 R1 G0 G1 B0 B1)
+    uint8_t mincol_quant_unpacked[3];
+    uint8_t maxcol_quant_unpacked[3];
+
+    _unpack_rgb_u8(mincol_quant, (uint8_t*)(mincol_quant_unpacked));
+    _unpack_rgb_u8(maxcol_quant, (uint8_t*)(maxcol_quant_unpacked));
+
+    uint8_t endpoints_q[6] = {
+        (uint8_t)(mincol_quant_unpacked[0]),
+        (uint8_t)(maxcol_quant_unpacked[0]),
+        (uint8_t)(mincol_quant_unpacked[1]),
+        (uint8_t)(maxcol_quant_unpacked[1]),
+        (uint8_t)(mincol_quant_unpacked[2]),
+        (uint8_t)(maxcol_quant_unpacked[2]),
+    };
+
+    // write out endpoints
+    unsigned int off = 17;  // starting bit position for endpoints data
+    constexpr uint8_t ep_bits = 5;
+    off = 17;  // starting bit position for endpoints data
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        _write_bits(endpoints_q[i], ep_bits, off, out_data);
+        off += ep_bits;
+    }
 }
 
 #else // ANDROID
@@ -1249,7 +1310,7 @@ void encode_block_int(
         );
     }
 
-    // Output buffers for quantized weights and output data
+    // Output buffer for quantized weights and output data
 	uint8_t wgt_buf[BLOCK_SIZE] = { 0 };
 
     // weights ISE encoding
