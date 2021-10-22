@@ -585,7 +585,7 @@ inline void read_block_min_max(
 }
 
 inline void downsample_12x12_to_8x5_u8_quant(
-    const uint8_t inp[192],
+    const uint8_t inp[BLOCK_PX_CNT + (16 - BLOCK_X)],
     uint8_t out[WGT_CNT]
 ){
     constexpr unsigned int w_inp = 12;
@@ -649,7 +649,6 @@ inline void downsample_12x12_to_8x5_u8_quant(
     // First, interpolate rows.
     for (unsigned int y = 0; y < h_inp; ++y)
     {
-        // TODO: This reads beyond the size of ideal_weights
         // Align the input values so that 1st, 2nd and 3rd samples of the input
         // row are at the 0th position of row0/1/2
         const uint8x16_t row0_u16 = vld1q_u8(inp + y*w_inp);
@@ -672,14 +671,6 @@ inline void downsample_12x12_to_8x5_u8_quant(
         // Shift back from 16-bit to 8-bit precision and store
         res_u16 = vshrq_n_u16(res_u16, 8);
         tmp[y] = vmovn_u16(res_u16);
-    }
-
-    for (unsigned int y = 0; y < h_inp; ++y)
-    {
-        LOGI("tmp[%2d] : %3d %3d %3d %3d %3d %3d %3d %3d\n", y,
-            tmp[y][0], tmp[y][1], tmp[y][2], tmp[y][3],
-            tmp[y][4], tmp[y][5], tmp[y][6], tmp[y][7]
-        );
     }
 
     // Next, columns (unrolled)
@@ -718,12 +709,11 @@ inline void downsample_12x12_to_8x5_u8_quant(
     res_u16[4] = vmlal_u8(res_u16[4], tmp[10], BILIN_WEIGHTS_Y_4[1]);
     res_u16[4] = vmlal_u8(res_u16[4], tmp[11], BILIN_WEIGHTS_Y_4[2]);
 
-    constexpr unsigned int SHR_QUANT = 8;// + 6; // Quantize to 2b while storing
+    constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
     for (unsigned int n = 0; n < h_out; ++n)
     {
         res_u16[n] = vshrq_n_u16(res_u16[n], SHR_QUANT);
-        uint8x8_t res = vmovn_u16(res_u16[n]);
-        // LOGI("addr: %d\n", w_out*n);
+        const uint8x8_t res = vmovn_u16(res_u16[n]);
         vst1_u8(&out[w_out*n], res);
     }
 }
@@ -846,7 +836,7 @@ void encode_block_int(
             -(int32_t)(shr_res)
         };
 
-        uint8_t ideal_weights[192] = { 0 };
+        uint8_t ideal_weights[BLOCK_PX_CNT + (16 - BLOCK_X)] = { 0 };
 
         for (unsigned int i = 0; i < BLOCK_PX_CNT / 4; ++i)
         {
@@ -855,35 +845,15 @@ void encode_block_int(
             // as well.
             uint32x4_t dot_x4 = vdotq_u32(one_x4, diff_x4, ep_sc8_x4);
 
-            // LOGI("dot[%3d]: %6d\n", 4*i+0, dot_x4[0]);
-            // LOGI("dot[%3d]: %6d\n", 4*i+1, dot_x4[1]);
-            // LOGI("dot[%3d]: %6d\n", 4*i+2, dot_x4[2]);
-            // LOGI("dot[%3d]: %6d\n", 4*i+3, dot_x4[3]);
-
             uint32x4_t res_x4 = vshlq_u32(dot_x4, shl_res_x4);
 
             ideal_weights[4*i+0] = (uint8_t)(res_x4[0]);
             ideal_weights[4*i+1] = (uint8_t)(res_x4[1]);
             ideal_weights[4*i+2] = (uint8_t)(res_x4[2]);
             ideal_weights[4*i+3] = (uint8_t)(res_x4[3]);
-
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+0, ideal_weights[4*i+0]);
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+1, ideal_weights[4*i+1]);
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+2, ideal_weights[4*i+2]);
-            // LOGI("iwgt[%3d]: %#04x\n", 4*i+3, ideal_weights[4*i+3]);
         }
 
         downsample_12x12_to_8x5_u8_quant(ideal_weights, quantized_weights);
-    }
-
-    for (int i = 0; i < 5; ++i)
-    {
-        LOGI("quant weights[%d]: %3d %3d %3d %3d %3d %3d %3d %3d\n", i,
-            quantized_weights[8*i+0], quantized_weights[8*i+1],
-            quantized_weights[8*i+2], quantized_weights[8*i+3],
-            quantized_weights[8*i+4], quantized_weights[8*i+5],
-            quantized_weights[8*i+6], quantized_weights[8*i+7]
-        );
     }
 
     // Calculate output data address (16 bytes per block)
@@ -1052,18 +1022,8 @@ inline void downsample_12x12_to_8x5_u8_quant(
         tmp[addr_o] = (uint8_t)(out7 >> 8);
     }
 
-    for (int i = 0; i < 12; ++i) {
-        LOGI("tmp[%2d] : %3d %3d %3d %3d %3d %3d %3d %3d\n", i,
-        //     tmp[8*i+0], tmp[8*i+1], tmp[8*i+2], tmp[8*i+3],
-        //     tmp[8*i+4], tmp[8*i+5], tmp[8*i+6], tmp[8*i+7]
-        // );
-            tmp[12*0+i], tmp[12*1+i], tmp[12*2+i], tmp[12*3+i],
-            tmp[12*4+i], tmp[12*5+i], tmp[12*6+i], tmp[12*7+i]
-        );
-    }
-
     // Next, columns
-    constexpr unsigned int SHR_QUANT = 8;// + 6; // Quantize to 2b while storing
+    constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
     for (unsigned int m = 0; m < w_out; ++m)
     {
         const unsigned int base_addr_i = m*h_inp;
@@ -1286,16 +1246,6 @@ void encode_block_int(
         downsample_12x12_to_8x5_u8_quant(
             ideal_weights,
             quantized_weights
-        );
-    }
-
-    for (int i = 0; i < 5; ++i)
-    {
-        LOGI("quant weights[%d]: %3d %3d %3d %3d %3d %3d %3d %3d\n", i,
-            quantized_weights[8*i+0], quantized_weights[8*i+1],
-            quantized_weights[8*i+2], quantized_weights[8*i+3],
-            quantized_weights[8*i+4], quantized_weights[8*i+5],
-            quantized_weights[8*i+6], quantized_weights[8*i+7]
         );
     }
 
