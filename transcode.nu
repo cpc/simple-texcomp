@@ -1,5 +1,7 @@
 #!/usr/bin/env nu
 
+let SIMPLE_ASTC_OUT_DIR = '/home/kubouch/git/cpc/simple-texcomp/test/out'
+
 # Encode/decode list of files
 def transcode [
     ...rest  # files to be transcoded
@@ -7,9 +9,9 @@ def transcode [
     ./transcoder $rest ../test
     echo $rest | each {
         let inp = (path dirname -r '../test' | path parse | update extension astc | path join)
-        let out = (path dirname -r '~/git/cpc/astc-encoder-dissection/test' | path expand | path parse | update extension png | path join)
+        let out = (path dirname -r $SIMPLE_ASTC_OUT_DIR | path expand | path parse | update extension png | path join)
         # let inp = (path dirname -r '../test' | path extension -r astc)
-        # let out = (path dirname -r ~/git/cpc/astc-encoder-dissection/test | path extension -r png)
+        # let out = (path dirname -r $SIMPLE_ASTC_OUT_DIR | path extension -r png)
         echo [[inp out]; [$inp $out]]
         astcenc -dl $inp $out
     }
@@ -44,19 +46,20 @@ def calculate-psnr [
 def transcode-dir [
     inp-dir: path         # directory with files to be encoded
     --astc-dir (-a): path # optional astc output directory (default is '../test')
-    --png-dir (-p): path  # optional png output directory (default is '~/git/cpc/astc-encoder-dissection/test')
+    --png-dir (-p): path  # optional png output directory (default is $SIMPLE_ASTC_OUT_DIR)
     --decode              # whether to decode the astc files
+    --psnr                # whether to calculate the psnr
 ] {
     let dir-basename = ($inp-dir | path basename)
 
     let astc-dir = (if ($astc-dir | empty?) { '../test' } { $astc-dir } | path expand)
     let astc-subdir = ([ $astc-dir $dir-basename ] | path join | path expand)
 
-    let png-dir = (if ($png-dir | empty?) { '~/git/cpc/astc-encoder-dissection/test' } { $png-dir })
+    let png-dir = (if ($png-dir | empty?) { $SIMPLE_ASTC_OUT_DIR } { $png-dir })
     let png-subdir = ([ $png-dir $dir-basename ] | path join)
 
     # let astc-out-dir = ([ '../test' $dir-basename ] | path join)
-    # let png-out-dir = ([ '~/git/cpc/astc-encoder-dissection/test' $dir-basename ] | path join | path expand)
+    # let png-out-dir = ([ $SIMPLE_ASTC_OUT_DIR $dir-basename ] | path join | path expand)
 
     let inp-files = (ls ($inp-dir | path expand)).name
 
@@ -74,11 +77,15 @@ def transcode-dir [
             astcenc -dl $astc-file $png-file
         }
 
-        if "combined_set" in ($inp-dir | into string) {
+
+        if ($psnr | empty?) {
+            echo "--- Not calculating PSNR, finished ---"
+        } {
+            let bn = ($inp-dir | path basename)
             source ~/git/extern/nu_scripts/virtual_environments/conda.nu
             load-env (conda-env common)
-            ~/git/scripts/calculate_psnr.py ~/data/combined_set "--list" "../combined_set.txt" "-o" "../test"
-        } { }
+            ~/git/scripts/calculate_psnr.py $inp-dir "--list" $"../($bn).txt" "-o" "../test/psnr"
+        }
     }
 }
 
@@ -88,7 +95,7 @@ def decode-dir [
 ] {
     let dir-basename = ($inp-dir | path basename)
 
-    let png-out-dir = ([ '~/git/cpc/astc-encoder-dissection/test' $dir-basename ] | path join | path expand)
+    let png-out-dir = ([ $SIMPLE_ASTC_OUT_DIR $dir-basename ] | path join | path expand)
 
     let inp-files = (ls $"($inp-dir)/*.astc").name
 
@@ -101,5 +108,8 @@ def decode-dir [
 
     source ~/git/extern/nu_scripts/virtual_environments/conda.nu
     load-env (conda-env common)
-    ~/git/scripts/calculate_psnr.py ~/data/combined_set "--list" "../combined_set.txt" "-o" "../test"
+    ~/git/scripts/calculate_psnr.py ~/pictures/combined_set "--list" "../combined_set.txt" "-o" "../test/psnr"
 }
+
+transcode-dir ~/pictures/combined_set -a ../test -p ../test/out --decode --psnr
+# transcode-dir ~/pictures/kodim/one -a ../test -p ../test/out --decode --psnr

@@ -1,5 +1,7 @@
 #include <cstdint>
 
+// #include <stdlib.h>
+
 #include "platform.hpp"
 
 
@@ -408,9 +410,13 @@ inline uint32_t approx_inv_u32(uint32_t x)
     // tmp = (x_sc * y0) >> 15;
     // y1 = y00 + y0 * (ONE_Q15 - tmp);
 
+    // printf("x: %d - scale: %d - shl: %d - shr %d - x_sc %d - A_x_sc %d - init %d - y1 %d - res: %u\n",
+    //     x, scale, shl, shr, x_sc, A_x_sc, init, y1, ((y1 << shl) >> shr));
+
     // The result is scaled down now, we need to scale it back
     y1 >>= 8; // Q10.22
-    return (y1 << shl) >> shr;
+    // TODO: The << *will* overflow (e.g., for x = 50)
+    return ((y1 << shl) >> shr) & 0xffffffff;
 }
 
 #if ASTC_SELECT_DIAG == 1
@@ -1141,6 +1147,15 @@ inline void downsample_12x12_to_8x5_u8_quant(
         addr_o += w_out;
         out[addr_o] = (uint8_t)(out4 >> SHR_QUANT);
     }
+
+    // for (int y = 0; y < h_out; ++y)
+    // {
+    //     for (int x = 0; x < w_out; ++x)
+    //     {
+    //         printf(" %#04x", out[y*w_out+x]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 /** Encode a block of pixels
@@ -1194,7 +1209,9 @@ void encode_block_int(
         block_pixels
     );
 
+    // printf("block\n");
     // print_minmax_u8("   ", mincol, maxcol);
+    // printf("mincol    : %#04x %#04x %#04x\n", mincol.x, mincol.y, mincol.z);
 
     // Move the endpoints line segment such that mincol is at zero
     uchar4 ep_vec;
@@ -1205,11 +1222,15 @@ void encode_block_int(
     mincol = mincol + inset;
     maxcol = maxcol - inset;
 
+    // printf("mincol    : %#04x %#04x %#04x\n", mincol.x, mincol.y, mincol.z);
+
     // print_minmax_u8("ins", mincol, maxcol);
 
     // Quantize the endpoints
     const uchar4 mincol_quant = quantize_5b(&mincol);
     const uchar4 maxcol_quant = quantize_5b(&maxcol);
+
+    // printf("mincol    : %#04x %#04x %#04x\n", mincol.x, mincol.y, mincol.z);
 
     // print_minmax_u8("mq ", mincol, maxcol);
     // print_minmax_u8("mqq", mincol_quant, maxcol_quant);
@@ -1274,7 +1295,9 @@ void encode_block_int(
         // printf("ep_sc32[1]: %#010x\n", ep_sc32[1]);
         // printf("ep_sc32[2]: %#010x\n", ep_sc32[2]);
         // printf("ep_sc8    : %#010x\n", *as_u32(&ep_sc8));
+        // printf("ep_sc8    : %#04x %#04x %#04x\n", ep_sc8.x, ep_sc8.y, ep_sc8.z);
         // printf("one       : %#010x\n", one);
+        // printf("mincol    : %#04x %#04x %#04x\n", mincol.x, mincol.y, mincol.z);
         // print_minmax_u8("          :", mincol, maxcol);
 
         // Pixels mapped to the endpoint line without quantization and
@@ -1290,11 +1313,15 @@ void encode_block_int(
             // dot product min: Q0.8 * Q0.8 + 3xADD = Q3.16 -> sat 0.16
             // recover lost precision by adding one
             uint32_t res;
+            // TODO: this does overflow 16 bits:
             _saturating_dot_acc_4u8(diff, ep_sc8, one, &res);
-            ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
+            ideal_weights[i] = (uint8_t)(u32min(res >> shr_res, 255));
+            // ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
 
-            // printf("dot[%3d] : %6d\n", i, res);
-            // printf("iwgt[%3d] : %#04x\n", i, ideal_weights[i]);
+            // printf("px  [%3d] : %#04x %#04x %#04x\n", i, block_pixels[i].x, block_pixels[i].y, block_pixels[i].z);
+            // printf("diff[%3d] : %#04x %#04x %#04x\n", i, diff.x, diff.y, diff.z);
+            // printf("dot [%3d] : %6d\n", i, res);
+            // printf("iwgt[%3d] : %3d\n", i, ideal_weights[i]);
         }
 
         downsample_12x12_to_8x5_u8_quant(

@@ -497,7 +497,20 @@ inline uint32_t u32max(uint32_t a, uint32_t b)
     if (a > b)
     {
         return a;
-    } else
+    }
+    else
+    {
+        return b;
+    }
+}
+
+inline uint32_t u32min(uint32_t a, uint32_t b)
+{
+    if (a < b)
+    {
+        return a;
+    }
+    else
     {
         return b;
     }
