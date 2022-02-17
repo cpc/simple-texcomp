@@ -42,21 +42,21 @@ inline void read_block_min_max(
     {
         const unsigned int off = img_w * (yb + y) + xb;
 
-        uint8x16_t r = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
-        uint8x16_t g = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
-        uint8x16_t b = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
+        uint8x16_t px0 = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
+        uint8x16_t px4 = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
+        uint8x16_t px8 = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
 
-        min_x4 = vminq_u8(min_x4, r);
-        min_x4 = vminq_u8(min_x4, g);
-        min_x4 = vminq_u8(min_x4, b);
+        min_x4 = vminq_u8(min_x4, px0);
+        min_x4 = vminq_u8(min_x4, px4);
+        min_x4 = vminq_u8(min_x4, px8);
 
-        max_x4 = vmaxq_u8(max_x4, r);
-        max_x4 = vmaxq_u8(max_x4, g);
-        max_x4 = vmaxq_u8(max_x4, b);
+        max_x4 = vmaxq_u8(max_x4, px0);
+        max_x4 = vmaxq_u8(max_x4, px4);
+        max_x4 = vmaxq_u8(max_x4, px8);
 
-        block_pixels_x4[3*y+0] = r;
-        block_pixels_x4[3*y+1] = g;
-        block_pixels_x4[3*y+2] = b;
+        block_pixels_x4[3*y+0] = px0;
+        block_pixels_x4[3*y+1] = px4;
+        block_pixels_x4[3*y+2] = px8;
     }
 
     const uint8x16_t mask_min_r_x4 = {
