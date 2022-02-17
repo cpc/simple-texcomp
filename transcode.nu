@@ -7,7 +7,7 @@ def transcode [
     ...rest  # files to be transcoded
 ] {
     ./transcoder $rest ../test
-    echo $rest | each {
+    echo $rest | each {|_|
         let inp = (path dirname -r '../test' | path parse | update extension astc | path join)
         let out = (path dirname -r $SIMPLE_ASTC_OUT_DIR | path expand | path parse | update extension png | path join)
         # let inp = (path dirname -r '../test' | path extension -r astc)
