@@ -25,7 +25,7 @@ def encode-dir [
     let dir-basename = ($inp-dir | path basename)
     let inp-files = (ls $inp-dir).name
 
-    let out-dir = (if ($out-dir | empty?) { '../test' } { $out-dir })
+    let out-dir = (if ($out-dir | empty?) { '../test' } else { $out-dir })
     let out-subdir = ([ $out-dir $dir-basename ] | path join)
 
     mkdir $out-subdir
@@ -52,10 +52,10 @@ def transcode-dir [
 ] {
     let dir-basename = ($inp-dir | path basename)
 
-    let astc-dir = (if ($astc-dir | empty?) { '../test' } { $astc-dir } | path expand)
+    let astc-dir = (if ($astc-dir | empty?) { '../test' } else { $astc-dir } | path expand)
     let astc-subdir = ([ $astc-dir $dir-basename ] | path join | path expand)
 
-    let png-dir = (if ($png-dir | empty?) { $SIMPLE_ASTC_OUT_DIR } { $png-dir })
+    let png-dir = (if ($png-dir | empty?) { $SIMPLE_ASTC_OUT_DIR } else { $png-dir })
     let png-subdir = ([ $png-dir $dir-basename ] | path join)
 
     # let astc-out-dir = ([ '../test' $dir-basename ] | path join)
@@ -68,7 +68,7 @@ def transcode-dir [
 
     if ($decode | empty?) {
         echo "--- Not decoding, finished ---"
-    } {
+    } else {
         mkdir $png-subdir
         for $inp-file in $inp-files {
             let astc-file = ($inp-file | path parse | update extension astc | update parent $astc-subdir | path join)
@@ -80,7 +80,7 @@ def transcode-dir [
 
         if ($psnr | empty?) {
             echo "--- Not calculating PSNR, finished ---"
-        } {
+        } else {
             let bn = ($inp-dir | path basename)
             source ~/git/extern/nu_scripts/virtual_environments/conda.nu
             load-env (conda-env common)
