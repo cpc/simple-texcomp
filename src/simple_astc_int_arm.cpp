@@ -22,7 +22,7 @@ inline void read_block_min_max(
     unsigned int img_w,
     uchar4* mincol,
     uchar4* maxcol,
-    uint8x16_t block_pixels_x4[36]  // 36 == 12 * 3 == 9 * 4
+    uint8x16_t block_pixels_x4[BLOCK_PX_CNT / 4]
 ) {
     ZoneScopedN("minmax");
 
@@ -38,25 +38,44 @@ inline void read_block_min_max(
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
 
-    for (unsigned int y = 0; y < BLOCK_Y; ++y)
-    {
-        const unsigned int off = img_w * (yb + y) + xb;
+    if constexpr(BLOCK_X == 12) {
+        for (unsigned int y = 0; y < BLOCK_Y; ++y)
+        {
+            const unsigned int off = img_w * (yb + y) + xb;
 
-        uint8x16_t px0 = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
-        uint8x16_t px4 = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
-        uint8x16_t px8 = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
+            uint8x16_t px0 = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
+            uint8x16_t px4 = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
+            uint8x16_t px8 = vld1q_u8(inp + NCH_RGB * (off + 8));  // pixels 8..11
 
-        min_x4 = vminq_u8(min_x4, px0);
-        min_x4 = vminq_u8(min_x4, px4);
-        min_x4 = vminq_u8(min_x4, px8);
+            min_x4 = vminq_u8(min_x4, px0);
+            min_x4 = vminq_u8(min_x4, px4);
+            min_x4 = vminq_u8(min_x4, px8);
 
-        max_x4 = vmaxq_u8(max_x4, px0);
-        max_x4 = vmaxq_u8(max_x4, px4);
-        max_x4 = vmaxq_u8(max_x4, px8);
+            max_x4 = vmaxq_u8(max_x4, px0);
+            max_x4 = vmaxq_u8(max_x4, px4);
+            max_x4 = vmaxq_u8(max_x4, px8);
 
-        block_pixels_x4[3*y+0] = px0;
-        block_pixels_x4[3*y+1] = px4;
-        block_pixels_x4[3*y+2] = px8;
+            block_pixels_x4[3*y+0] = px0;
+            block_pixels_x4[3*y+1] = px4;
+            block_pixels_x4[3*y+2] = px8;
+        }
+    } else if constexpr(BLOCK_X == 8) {
+        for (unsigned int y = 0; y < BLOCK_Y; ++y)
+        {
+            const unsigned int off = img_w * (yb + y) + xb;
+
+            uint8x16_t px0 = vld1q_u8(inp + NCH_RGB * (off + 0));  // pixels 0..3
+            uint8x16_t px4 = vld1q_u8(inp + NCH_RGB * (off + 4));  // pixels 4..7
+
+            min_x4 = vminq_u8(min_x4, px0);
+            min_x4 = vminq_u8(min_x4, px4);
+
+            max_x4 = vmaxq_u8(max_x4, px0);
+            max_x4 = vmaxq_u8(max_x4, px4);
+
+            block_pixels_x4[2*y+0] = px0;
+            block_pixels_x4[2*y+1] = px4;
+        }
     }
 
     const uint8x16_t mask_min_r_x4 = {
