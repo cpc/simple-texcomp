@@ -276,35 +276,6 @@ inline void _write_bits(int value, int bitcount, int bitoffset, uint8_t* ptr)
 
 #endif // __TCE__
 
-// Precomputed coefficients used in horizontal bilinear interpolation
-constexpr uchar4 BILIN_WEIGHTS_X_8_U8[10] = {          //  IDX:
-    { 187,  68,   0,   0, },                           //  {  0,  1,  0, },
-    {   0, 111, 128,  16, },                           //  {  1,  2,  3, },
-    {   0,   0,  42, 142, }, {  71,   0,   0,   0, },  //  {  2,  3,  4, },
-    {  90, 135,  30,   0, },                           //  {  4,  5,  6, },
-    {   0,  30, 135,  90, },                           //  {  5,  6,  7, },
-    {   0,   0,   0,  71, }, { 142,  42,   0,   0, },  //  {  7,  8,  9, },
-    {  16, 128, 111,   0, },                           //  {  8,  9, 10, },
-    {   0,   0,  68, 187, },                           //  { 10, 11,  0, },
-};
-
-// Precomputed coefficients used in vertical bilinear interpolation
-// IDX:
-// {  0,  1,  2,  0,  0,  0, },
-// {  1,  2,  3,  4,  5,  0, },
-// {  3,  4,  5,  6,  7,  8, },
-// {  6,  7,  8,  9, 10,  0, },
-// {  9, 10, 11,  0,  0,  0, },
-constexpr uchar4 BILIN_WEIGHTS_Y_5_U8[9] = {
-    { 134,  85,  36,   0, },
-    {   0,  34,  68,  85, }, {  51,  17,   0,   0, },
-    // bumped two middle values to sum up to 254:
-    {   0,   0,   0,   8, }, {  42,  77,  77,  42, }, {   8,   0,   0,   0, },
-    {   0,   0,  17,  51, }, {  85,  68,  34,   0, },
-    {   0,  36,  85, 134, },
-};
-
-
 /** Return a pointer to uchar4 vector as a uint32_t pointer */
 inline uint32_t* as_u32(const uchar4* x)
 {

@@ -67,6 +67,35 @@ inline void downsample_12x12_to_8x5_u8_quant(
     constexpr unsigned int pixel_count_x = 3;
     constexpr unsigned int pixel_count_y = 6;
 
+
+    // Precomputed coefficients used in horizontal bilinear interpolation
+    constexpr uchar4 BILIN_WEIGHTS_X_8_U8[10] = {          //  IDX:
+        { 187,  68,   0,   0, },                           //  {  0,  1,  0, },
+        {   0, 111, 128,  16, },                           //  {  1,  2,  3, },
+        {   0,   0,  42, 142, }, {  71,   0,   0,   0, },  //  {  2,  3,  4, },
+        {  90, 135,  30,   0, },                           //  {  4,  5,  6, },
+        {   0,  30, 135,  90, },                           //  {  5,  6,  7, },
+        {   0,   0,   0,  71, }, { 142,  42,   0,   0, },  //  {  7,  8,  9, },
+        {  16, 128, 111,   0, },                           //  {  8,  9, 10, },
+        {   0,   0,  68, 187, },                           //  { 10, 11,  0, },
+    };
+
+    // Precomputed coefficients used in vertical bilinear interpolation
+    // IDX:
+    // {  0,  1,  2,  0,  0,  0, },
+    // {  1,  2,  3,  4,  5,  0, },
+    // {  3,  4,  5,  6,  7,  8, },
+    // {  6,  7,  8,  9, 10,  0, },
+    // {  9, 10, 11,  0,  0,  0, },
+    constexpr uchar4 BILIN_WEIGHTS_Y_5_U8[9] = {
+        { 134,  85,  36,   0, },
+        {   0,  34,  68,  85, }, {  51,  17,   0,   0, },
+        // bumped two middle values to sum up to 254:
+        {   0,   0,   0,   8, }, {  42,  77,  77,  42, }, {   8,   0,   0,   0, },
+        {   0,   0,  17,  51, }, {  85,  68,  34,   0, },
+        {   0,  36,  85, 134, },
+    };
+
     // Buffer for holding intermediate results (columns stored as rows for easy
     // access in the second loop).
     // volatile uint8_t tmp[w_out*h_inp];

@@ -70,6 +70,34 @@ inline void downsample_12x12_to_8x5_u8_quant(
     constexpr unsigned int pixel_count_x = 3;
     constexpr unsigned int pixel_count_y = 6;
 
+    // Precomputed coefficients used in horizontal bilinear interpolation
+    constexpr uchar4 BILIN_WEIGHTS_X_8_U8[10] = {          //  IDX:
+        { 187,  68,   0,   0, },                           //  {  0,  1,  0, },
+        {   0, 111, 128,  16, },                           //  {  1,  2,  3, },
+        {   0,   0,  42, 142, }, {  71,   0,   0,   0, },  //  {  2,  3,  4, },
+        {  90, 135,  30,   0, },                           //  {  4,  5,  6, },
+        {   0,  30, 135,  90, },                           //  {  5,  6,  7, },
+        {   0,   0,   0,  71, }, { 142,  42,   0,   0, },  //  {  7,  8,  9, },
+        {  16, 128, 111,   0, },                           //  {  8,  9, 10, },
+        {   0,   0,  68, 187, },                           //  { 10, 11,  0, },
+    };
+
+    // Precomputed coefficients used in vertical bilinear interpolation
+    // IDX:
+    // {  0,  1,  2,  0,  0,  0, },
+    // {  1,  2,  3,  4,  5,  0, },
+    // {  3,  4,  5,  6,  7,  8, },
+    // {  6,  7,  8,  9, 10,  0, },
+    // {  9, 10, 11,  0,  0,  0, },
+    constexpr uchar4 BILIN_WEIGHTS_Y_5_U8[9] = {
+        { 134,  85,  36,   0, },
+        {   0,  34,  68,  85, }, {  51,  17,   0,   0, },
+        // bumped two middle values to sum up to 254:
+        {   0,   0,   0,   8, }, {  42,  77,  77,  42, }, {   8,   0,   0,   0, },
+        {   0,   0,  17,  51, }, {  85,  68,  34,   0, },
+        {   0,  36,  85, 134, },
+    };
+
     // Buffer for holding intermediate results (columns stored as rows for easy
     // access in the second loop).
     // volatile uint8_t tmp[w_out*h_inp];
@@ -237,6 +265,114 @@ inline void downsample_12x12_to_8x5_u8_quant(
     // }
 }
 
+/** Downsample 8x8 block into 8x5 using bilinear filtering and quantize it
+ *
+ * The inp/out grid size is fixed and one channel per sample is assumed.
+ * The output is also quantized.
+ */
+inline void downsample_8x8_to_8x5_u8_quant(
+    const uint8_t inp[BLOCK_PX_CNT],
+    uint8_t out[WGT_CNT]
+){
+    ZoneScopedN("bilin");
+
+    constexpr unsigned int w_inp = 8;
+    constexpr unsigned int h_inp = 8;
+    constexpr unsigned int w_out = 8;
+    constexpr unsigned int h_out = 5;
+
+    constexpr uchar4 BILIN_WEIGHTS_Y_5_U8[9] = {
+        { 179,  76,   0,   0, },                          // 0 1
+        {   0,  85, 128,  42, },                          // 1 2 3
+        {   0,   0,  21, 106, }, { 106,  21,   0,   0, }, // 2 3 4 5
+        {  42, 128,  85,   0, },                          // 4 5 6
+        {   0,   0,  76, 179, },                          // 6 7
+    };
+
+    // TODO: This is just a quick hack to get it working. Should use the mac
+    // as in the ARM version.
+    volatile uint8_t tmp[h_inp*w_out];
+
+    // First, transpose the input 8x8 blocks so that columns are rows.
+    for (unsigned int y = 0; y < h_inp; ++y)
+    {
+        const unsigned int base_addr_i = y*w_inp;
+
+        for (unsigned int x = 0; x < w_out; ++x)
+        {
+            unsigned int addr_o = y + x*h_inp;
+            tmp[addr_o] = inp[base_addr_i + x];
+        }
+    }
+
+    // Interpolate columns directly
+    constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
+    for (unsigned int m = 0; m < w_out; ++m)
+    {
+        const unsigned int base_addr_i = m*h_inp;
+
+        uchar4 tmp0, tmp4;
+        _load_4u8(tmp + base_addr_i + 0, &tmp0);
+        _load_4u8(tmp + base_addr_i + 4, &tmp4);
+
+        // n = 0
+        const uchar4 wgt0 = BILIN_WEIGHTS_Y_5_U8[0];
+
+        uint32_t out0;
+        _saturating_dot_acc_4u8(tmp0, wgt0, 0, &out0);
+
+        unsigned int addr_o = m;
+        out[addr_o] = (uint8_t)(out0 >> SHR_QUANT);
+
+        // n = 1
+        const uchar4 wgt1 = BILIN_WEIGHTS_Y_5_U8[1];
+
+        uint32_t out1;
+        _saturating_dot_acc_4u8(tmp0, wgt1, 0, &out1);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out1 >> SHR_QUANT);
+
+        // n = 2
+        const uchar4 wgt2a = BILIN_WEIGHTS_Y_5_U8[2];
+        const uchar4 wgt2b = BILIN_WEIGHTS_Y_5_U8[3];
+
+        uint32_t out2;
+        _saturating_dot_acc_4u8(tmp0, wgt2a, 0, &out2);
+        _saturating_dot_acc_4u8(tmp4, wgt2b, out2, &out2);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out2 >> SHR_QUANT);
+
+        // n = 3
+        const uchar4 wgt3 = BILIN_WEIGHTS_Y_5_U8[4];
+
+        uint32_t out3;
+        _saturating_dot_acc_4u8(tmp4, wgt3, 0, &out3);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out3 >> SHR_QUANT);
+
+        // n = 4
+        const uchar4 wgt4 = BILIN_WEIGHTS_Y_5_U8[5];
+
+        uint32_t out4;
+        _saturating_dot_acc_4u8(tmp4, wgt4, 0, &out4);
+
+        addr_o += w_out;
+        out[addr_o] = (uint8_t)(out4 >> SHR_QUANT);
+    }
+
+    // for (int y = 0; y < h_out; ++y)
+    // {
+    //     for (int x = 0; x < w_out; ++x)
+    //     {
+    //         printf(" %#04x", out[y*w_out+x]);
+    //     }
+    //     printf("\n");
+    // }
+}
+
 /** Encode a block of pixels
  *
  * The block_id_x/y could be substituted with get_global_id() if converted to
@@ -385,10 +521,13 @@ void encode_block_int(
             // printf("iwgt[%3d] : %3d\n", i, ideal_weights[i]);
         }
 
-        downsample_12x12_to_8x5_u8_quant(
-            ideal_weights,
-            quantized_weights
-        );
+        if constexpr(BLOCK_X == 12 && BLOCK_Y == 12) {
+            downsample_12x12_to_8x5_u8_quant(ideal_weights, quantized_weights);
+        } else if constexpr(BLOCK_X == 8 && BLOCK_Y == 8) {
+            downsample_8x8_to_8x5_u8_quant(ideal_weights, quantized_weights);
+        } else {
+            return;
+        }
     }
 
     // Output buffer for quantized weights and output data

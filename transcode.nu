@@ -112,7 +112,7 @@ def decode-dir [
     ~/git/scripts/calculate_psnr.py $"~/pictures/($dataset-name)" "--list" $"../($dataset-name).txt" "-o" "../test/psnr"
 }
 
-def main [] {
+# def main [] {
     transcode-dir ~/pictures/combined_set -a ../test -p ../test/out --decode --psnr
     # transcode-dir ~/pictures/kodim/one -a ../test -p ../test/out --decode --psnr
-}
+# }
