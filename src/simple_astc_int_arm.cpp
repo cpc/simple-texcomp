@@ -327,25 +327,6 @@ inline void downsample_8x8_to_8x5_u8_quant(
     for (unsigned int y = 0; y < h_inp; ++y)
     {
         tmp[y] = vld1_u8(inp + y*w_inp);
-    //     const uint8x16_t row1_u16 = vextq_u8(row0_u16, row0_u16, 1);
-    //     const uint8x16_t row2_u16 = vextq_u8(row0_u16, row0_u16, 2);
-
-    //     // We calculate only 8 values => pack them into one 8-byte vector
-    //     const uint8x8_t row0 = vqtbl1_u8(row0_u16, IDX_X);  // table select
-    //     const uint8x8_t row1 = vqtbl1_u8(row1_u16, IDX_X);
-    //     const uint8x8_t row2 = vqtbl1_u8(row2_u16, IDX_X);
-
-    //     // Results storage
-    //     uint16x8_t res_u16 = { 0 };
-
-    //     // Calculate the dot product by two multiply-adds
-    //     res_u16 = vmlal_u8(res_u16, row0, BILIN_WEIGHTS_X_0);
-    //     res_u16 = vmlal_u8(res_u16, row1, BILIN_WEIGHTS_X_1);
-    //     res_u16 = vmlal_u8(res_u16, row2, BILIN_WEIGHTS_X_2);
-
-    //     // Shift back from 16-bit to 8-bit precision and store
-    //     res_u16 = vshrq_n_u16(res_u16, 8);
-    //     tmp[y] = vmovn_u16(res_u16);
     }
 
     // Next, interpolate columns (unrolled)
