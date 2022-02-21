@@ -76,6 +76,8 @@ inline void read_block_min_max(
             block_pixels_x4[2*y+0] = px0;
             block_pixels_x4[2*y+1] = px4;
         }
+    } else {
+        return;
     }
 
     const uint8x16_t mask_min_r_x4 = {
@@ -260,6 +262,129 @@ inline void downsample_12x12_to_8x5_u8_quant(
     }
 }
 
+inline void downsample_8x8_to_8x5_u8_quant(
+    const uint8_t inp[BLOCK_PX_CNT + (16 - BLOCK_X)],
+    uint8_t out[WGT_CNT]
+){
+    ZoneScopedN("bilin");
+
+    constexpr unsigned int w_inp = 8;
+    constexpr unsigned int h_inp = 8;
+    constexpr unsigned int w_out = 8;
+    constexpr unsigned int h_out = 5;
+
+    // constexpr uint8x8_t BILIN_WEIGHTS_X_0 = {
+    //     187, 111,  42,  90,  30,  71,  16,  68,
+    // };
+
+    // constexpr uint8x8_t BILIN_WEIGHTS_X_1 = {
+    //      68, 128, 142, 135, 135, 142, 128, 187,
+    // };
+
+    // constexpr uint8x8_t BILIN_WEIGHTS_X_2 = {
+    //       0,  16,  71,  30,  90,  42, 111,  0,
+    // };
+
+    // constexpr uint8x8_t IDX_X = { 0, 1, 2, 4, 5, 7, 8, 10 };
+
+    // 0 1
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_0[2] = {
+        { 179, 179, 179, 179, 179, 179, 179, 179, },
+        { 76,  76,  76,  76,  76,  76,  76,  76,  },
+    };
+
+    // 1 2 3
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_1[3] = {
+        { 85,  85,  85,  85,  85,  85,  85,  85,  },
+        { 128, 128, 128, 128, 128, 128, 128, 128, },
+        { 42,  42,  42,  42,  42,  42,  42,  42,  },
+    };
+
+    // 2 3 4 5
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_2[4] = {
+        { 21,  21,  21,  21,  21,  21,  21,  21,  },
+        { 106, 106, 106, 106, 106, 106, 106, 106, },
+        { 106, 106, 106, 106, 106, 106, 106, 106, },
+        { 21,  21,  21,  21,  21,  21,  21,  21,  },
+    };
+
+    // 4 5 6
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_3[3] = {
+        { 42,  42,  42,  42,  42,  42,  42,  42,  },
+        { 128, 128, 128, 128, 128, 128, 128, 128, },
+        { 85,  85,  85,  85,  85,  85,  85,  85,  },
+    };
+
+    // 6 7
+    constexpr uint8x8_t BILIN_WEIGHTS_Y_4[2] = {
+        { 76,  76,  76,  76,  76,  76,  76,  76,  },
+        { 179, 179, 179, 179, 179, 179, 179, 179, },
+    };
+
+    uint8x8_t tmp[h_inp];
+
+    // First, read rows.
+    for (unsigned int y = 0; y < h_inp; ++y)
+    {
+        tmp[y] = vld1_u8(inp + y*w_inp);
+    //     const uint8x16_t row1_u16 = vextq_u8(row0_u16, row0_u16, 1);
+    //     const uint8x16_t row2_u16 = vextq_u8(row0_u16, row0_u16, 2);
+
+    //     // We calculate only 8 values => pack them into one 8-byte vector
+    //     const uint8x8_t row0 = vqtbl1_u8(row0_u16, IDX_X);  // table select
+    //     const uint8x8_t row1 = vqtbl1_u8(row1_u16, IDX_X);
+    //     const uint8x8_t row2 = vqtbl1_u8(row2_u16, IDX_X);
+
+    //     // Results storage
+    //     uint16x8_t res_u16 = { 0 };
+
+    //     // Calculate the dot product by two multiply-adds
+    //     res_u16 = vmlal_u8(res_u16, row0, BILIN_WEIGHTS_X_0);
+    //     res_u16 = vmlal_u8(res_u16, row1, BILIN_WEIGHTS_X_1);
+    //     res_u16 = vmlal_u8(res_u16, row2, BILIN_WEIGHTS_X_2);
+
+    //     // Shift back from 16-bit to 8-bit precision and store
+    //     res_u16 = vshrq_n_u16(res_u16, 8);
+    //     tmp[y] = vmovn_u16(res_u16);
+    }
+
+    // Next, interpolate columns (unrolled)
+    uint16x8_t res_u16[h_out] = {
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+        { 0, 0, 0, 0, 0, 0, 0, 0, },
+    };
+
+    res_u16[0] = vmlal_u8(res_u16[0], tmp[0], BILIN_WEIGHTS_Y_0[0]);
+    res_u16[0] = vmlal_u8(res_u16[0], tmp[1], BILIN_WEIGHTS_Y_0[1]);
+
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[1], BILIN_WEIGHTS_Y_1[0]);
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[2], BILIN_WEIGHTS_Y_1[1]);
+    res_u16[1] = vmlal_u8(res_u16[1], tmp[3], BILIN_WEIGHTS_Y_1[2]);
+
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[3], BILIN_WEIGHTS_Y_2[0]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[4], BILIN_WEIGHTS_Y_2[1]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[5], BILIN_WEIGHTS_Y_2[2]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[6], BILIN_WEIGHTS_Y_2[3]);
+
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[6],  BILIN_WEIGHTS_Y_3[0]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[7],  BILIN_WEIGHTS_Y_3[1]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[8],  BILIN_WEIGHTS_Y_3[2]);
+
+    res_u16[4] = vmlal_u8(res_u16[4], tmp[9],  BILIN_WEIGHTS_Y_4[0]);
+    res_u16[4] = vmlal_u8(res_u16[4], tmp[10], BILIN_WEIGHTS_Y_4[1]);
+
+    constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
+    for (unsigned int n = 0; n < h_out; ++n)
+    {
+        res_u16[n] = vshrq_n_u16(res_u16[n], SHR_QUANT);
+        const uint8x8_t res = vmovn_u16(res_u16[n]);
+        vst1_u8(&out[w_out*n], res);
+    }
+}
+
 void encode_block_int(
     const uint8_t* __restrict__ inp_img,
     unsigned int block_id_x,
@@ -395,7 +520,13 @@ void encode_block_int(
             ideal_weights[4*i+3] = (uint8_t)(res_x4[3]);
         }
 
-        downsample_12x12_to_8x5_u8_quant(ideal_weights, quantized_weights);
+        if constexpr(BLOCK_X == 12 && BLOCK_Y == 12) {
+            downsample_12x12_to_8x5_u8_quant(ideal_weights, quantized_weights);
+        } else if constexpr(BLOCK_X == 8 && BLOCK_Y == 8) {
+            downsample_8x8_to_8x5_u8_quant(ideal_weights, quantized_weights);
+        } else {
+            return;
+        }
     }
 
     // Output buffer for quantized weights and output data
