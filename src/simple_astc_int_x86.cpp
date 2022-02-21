@@ -512,8 +512,8 @@ void encode_block_int(
             uint32_t res;
             // TODO: this does overflow 16 bits:
             _saturating_dot_acc_4u8(diff, ep_sc8, one, &res);
-            ideal_weights[i] = (uint8_t)(u32min(res >> shr_res, 255));
-            // ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
+            // ideal_weights[i] = (uint8_t)(u32min(res >> shr_res, 255));
+            ideal_weights[i] = (uint8_t)(res >> shr_res);  // -> Q0.8
 
             // printf("px  [%3d] : %#04x %#04x %#04x\n", i, block_pixels[i].x, block_pixels[i].y, block_pixels[i].z);
             // printf("diff[%3d] : %#04x %#04x %#04x\n", i, diff.x, diff.y, diff.z);
