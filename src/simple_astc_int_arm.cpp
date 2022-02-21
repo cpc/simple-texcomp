@@ -364,17 +364,17 @@ inline void downsample_8x8_to_8x5_u8_quant(
     res_u16[1] = vmlal_u8(res_u16[1], tmp[2], BILIN_WEIGHTS_Y_1[1]);
     res_u16[1] = vmlal_u8(res_u16[1], tmp[3], BILIN_WEIGHTS_Y_1[2]);
 
-    res_u16[2] = vmlal_u8(res_u16[2], tmp[3], BILIN_WEIGHTS_Y_2[0]);
-    res_u16[2] = vmlal_u8(res_u16[2], tmp[4], BILIN_WEIGHTS_Y_2[1]);
-    res_u16[2] = vmlal_u8(res_u16[2], tmp[5], BILIN_WEIGHTS_Y_2[2]);
-    res_u16[2] = vmlal_u8(res_u16[2], tmp[6], BILIN_WEIGHTS_Y_2[3]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[2], BILIN_WEIGHTS_Y_2[0]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[3], BILIN_WEIGHTS_Y_2[1]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[4], BILIN_WEIGHTS_Y_2[2]);
+    res_u16[2] = vmlal_u8(res_u16[2], tmp[5], BILIN_WEIGHTS_Y_2[3]);
 
-    res_u16[3] = vmlal_u8(res_u16[3], tmp[6],  BILIN_WEIGHTS_Y_3[0]);
-    res_u16[3] = vmlal_u8(res_u16[3], tmp[7],  BILIN_WEIGHTS_Y_3[1]);
-    res_u16[3] = vmlal_u8(res_u16[3], tmp[8],  BILIN_WEIGHTS_Y_3[2]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[4], BILIN_WEIGHTS_Y_3[0]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[5], BILIN_WEIGHTS_Y_3[1]);
+    res_u16[3] = vmlal_u8(res_u16[3], tmp[6], BILIN_WEIGHTS_Y_3[2]);
 
-    res_u16[4] = vmlal_u8(res_u16[4], tmp[9],  BILIN_WEIGHTS_Y_4[0]);
-    res_u16[4] = vmlal_u8(res_u16[4], tmp[10], BILIN_WEIGHTS_Y_4[1]);
+    res_u16[4] = vmlal_u8(res_u16[4], tmp[6], BILIN_WEIGHTS_Y_4[0]);
+    res_u16[4] = vmlal_u8(res_u16[4], tmp[7], BILIN_WEIGHTS_Y_4[1]);
 
     constexpr unsigned int SHR_QUANT = 8 + 6; // Quantize to 2b while storing
     for (unsigned int n = 0; n < h_out; ++n)

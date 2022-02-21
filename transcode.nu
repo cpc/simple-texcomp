@@ -91,7 +91,8 @@ def transcode-dir [
 
 # Decode all .astc files in a directory
 def decode-dir [
-    inp-dir: path  # directory with files to be encoded
+    inp-dir: path         # directory with files to be encoded
+    dataset-name: string  # name of the dataset (e.g., combined_set)
 ] {
     let dir-basename = ($inp-dir | path basename)
 
@@ -108,8 +109,10 @@ def decode-dir [
 
     source ~/git/extern/nu_scripts/virtual_environments/conda.nu
     load-env (conda-env common)
-    ~/git/scripts/calculate_psnr.py ~/pictures/combined_set "--list" "../combined_set.txt" "-o" "../test/psnr"
+    ~/git/scripts/calculate_psnr.py $"~/pictures/($dataset-name)" "--list" $"../($dataset-name).txt" "-o" "../test/psnr"
 }
 
-transcode-dir ~/pictures/combined_set -a ../test -p ../test/out --decode --psnr
-# transcode-dir ~/pictures/kodim/one -a ../test -p ../test/out --decode --psnr
+def main [] {
+    transcode-dir ~/pictures/combined_set -a ../test -p ../test/out --decode --psnr
+    # transcode-dir ~/pictures/kodim/one -a ../test -p ../test/out --decode --psnr
+}

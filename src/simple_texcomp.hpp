@@ -54,8 +54,8 @@ constexpr int NCH_RGB  = 4;
 namespace astc {
 
     /* Input ASTC block size */
-    constexpr int BLOCK_X = 12;
-    constexpr int BLOCK_Y = 12;
+    constexpr int BLOCK_X = 8;
+    constexpr int BLOCK_Y = 8;
 
     /* Maximum input block size */
     constexpr int MAX_BLOCK_DIM = 12;
