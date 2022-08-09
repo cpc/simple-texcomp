@@ -1,46 +1,28 @@
-# Simple BCn
+# Simple Texcomp
 
-Simple scalar CPU implementation of BC1 and YCoCg-BC3 texture compression algorithms.
-It is a direct translation of the [reference real-time GPU implementation by Waveren and Castaño](https://developer.download.nvidia.com/whitepapers/2007/Real-Time-YCoCg-DXT-Compression/Real-Time%20YCoCg-DXT%20Compression.pdf).
+Simple CPU implementations of various texture compression encoders:
 
-## Files & Notes
+* A direct translation of the [reference real-time GPU implementation by Waveren and Castaño](https://developer.download.nvidia.com/whitepapers/2007/Real-Time-YCoCg-DXT-Compression/Real-Time%20YCoCg-DXT%20Compression.pdf).
+  * `src/simple_bc1.h`: Implementation of the BC1 algorithm (low quality, 6:1 compression)
+  * `src/simple_ycocg_bc3.h`: Implementation of the YCoCg-BC3 algorithm (high quality, 3:1 compression)
+* Various implementations of [ASTC format](https://en.wikipedia.org/wiki/Adaptive_scalable_texture_compression) encoders with heavily pruned encoding configurations
+  * `src/simple_astc.cpp`: Floating point implementation of the pruned ASTC encoder
+  * `src/simple_astc_int_<target>.cpp`: Integer implementations fo the pruned ASTC encoder, where `<target>` denotes the target platform:
+    * `arm`: Developed for armv8a ISA (Samsung S10 smartphone)
+    * `x86`: For a general PC / laptop
+    * `tce`: For [TCE](https://github.com/cpc/tce)
+* RGB <-> YCoCg color space conversion
+  * `src/simple_ycocg.cpp`
 
-* `simple_bc1.h`: Implementation of the BC1 algorithm (low quality, 6:1 compression)
-  * Setting `SELECT_DIAG` to `0` disables an optional refinement step (when enabled, it sometimes improves quality but runs slightly slower)
-  * Functions for encoding/decoding one 4x4 pixel block
-* `simple_ycocg_bc3.h`: Implementation of the YCoCg-BC3 algorithm (high quality, 3:1 compression)
-  * Functions for encoding/decoding one 4x4 pixel block
-* `simple_bcn_common.h`: Common definitions for the two files above
-* `transcoder.cpp`: An example CLI app for encoding, decoding and saving the results
-  * Select encoding algorithm with the `ENC_FORMAT` constant
-  * Accepts images to be encoded as CLI arguments, the last argument is an output directory
-    * Outputs decoded images into the output directory
-    * (optional: uncomment if desired) Outputs raw encoded bytes into the output directory (with a `.bin` extension)
-  * Example functions for encoding/decoding the whole image (must have width/height divisible by 4 due to the 4x4 block size)
-* `Makefile`: Requires C++17 standard due to the use of `std::filesystem` for convenience in `transcoder.cpp`, `simple_*.h` should be C++11-compatible
-* `stb/`: Image reading/writing (https://github.com/nothings/stb)
+The whole project is wrapped under the `src/simple_texcomp.hpp` header as a library.
+A `transcoder` command line application is built using this library (`src/transcoder_*` files) and can be used for encoding (in some cases also decoding) groups of images.
 
-## Quality Comparison
+## Building
 
-The quality is slightly different between the CPU and GPU version due to the differences of floating point precision on both platforms.
+This project uses meson build system, clang++ compiler and requires C++17.
 
-### Average PSNR (dB) vs. uncompressed:
+## Android App
 
-(decoded with https://github.com/ifeherva/bcndecode, not this repository)
-
-| dataset |  algorithm |  CPU(this) | GPU(OpenCL) |
-|:------- |:---------- | ----------:| -----------:|
-| kodim   | bc1_nosel  | 34.9159    | 34.9122     |
-| kodim   | bc1_sel    | 35.1000    | 35.6300     |
-| kodim   | ycocg_bc3  | 41.1476    | 41.1392     |
-| rgb8bit | bc1_nosel  | 37.7007    | 37.6845     |
-| rgb8bit | bc1_sel    | 37.9900    | 37.9723     |
-| rgb8bit | ycocg_bc3  | 42.4742    | 42.4597     |
-
-* bc1_nosel : using `simple_bc1.h` with `#define SELECT_DIAG 0`
-* bc1_sel   : using `simple_bc1.h` with `#define SELECT_DIAG 1`
-* ycocg_bc3 : using `ycocg_bc3.h`
-
-Datasets:
-* kodim: http://r0k.us/graphics/kodak/index.html
-* rgb8bit: http://imagecompression.info/test_images
+There is an app for testing the integer ASTC encoder on a smartphone called "TexcompApp" under `android/`.
+This app also includes a standalone JPEG encoder using the turbojpeg library.
+The JPEG encoder can also be separately compiled as a command line utility (search for `build_tjenc.sh`).
